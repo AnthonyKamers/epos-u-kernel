@@ -2,6 +2,9 @@
 
 #ifndef __riscv_qspi_h
 #define __riscv_qspi_h
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#define SIFIVE_SPI_FMT_LEN(x)            ((unsigned int)(x) << 16)
+#define SIFIVE_SPI_FMT_LEN_MASK          (0xfU << 16)
 
 #include <architecture/cpu.h>
 #include <machine/spi.h>
@@ -35,7 +38,10 @@ public:
     // Useful bits from multiple registers
     enum {
       SCK_PHA = 0b0,
-      SCK_POL = 0b1
+      SCK_POL = 0b1,
+      MODE_QUAD = 0b10,
+      MODE_DUAL = 0b01,
+      MODE_SINGLE = 0b00
     };
 private:
   static volatile CPU::Reg32 & reg(unsigned int o) { return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI0_BASE)[o / sizeof(CPU::Reg32)]; }
@@ -45,8 +51,15 @@ public:
     config(clock, protocol, mode, bit_rate, data_bits);
   }
   void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
-    
+    reg(SCKDIV) = DIV_ROUND_UP(clock >> 1, clock) - 1 & 0xfffU; // change second clock to slave (probably)
+    unsigned int fmt = 0;
+    fmt |= MODE_QUAD << 30; // proto
+    fmt |= 1 << 29; // endian
+    // dir is 0
+    fmt |= (0xFF & data_bits) << 12; // len
+    reg(FMT) = fmt; 
   }
+  
 
   bool rxd_ok() {
     return (reg(RXDATA) & 1);
