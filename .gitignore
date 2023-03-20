@@ -1,0 +1,18 @@
+# IDE
+.idea
+
+# C output generated files
+**.o
+
+# Epos generated files
+eposcfg
+eposmkbi
+eposmkbi.conf
+eposcc.conf
+include/system/config.h
+
+# All related apps existing
+hello*
+
+# Git Ignore of other directories
+.gitignore
