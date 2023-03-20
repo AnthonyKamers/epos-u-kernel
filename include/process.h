@@ -21,7 +21,7 @@ class Thread
     friend class System;                // for init()
 
 protected:
-    static const bool preemptive = Traits<Thread>::preemptive;
+    static const bool preemptive = false; //Traits<Thread>::preemptive;
     static const bool reboot = Traits<System>::reboot;
 
     static const unsigned int QUANTUM = Traits<Thread>::QUANTUM;
