@@ -12,7 +12,7 @@ int main()
 
     cout << "QSPI test\n" << endl;
 
-    QSPI myQspi();
+    QSPI myQspi(22729000, 0, 0, 4, 4);
 
     for(int i = 0; i < 256; i++) {
       myQspi.put(i);
@@ -21,7 +21,9 @@ int main()
         cout << " failed (" << c << ", should be " << i << ")!" << endl;
     }
 
-    /* SiFive_UART uart(115200, 8, 0, 0, 1);
+    cout << "UART test\n" << endl;
+
+    SiFive_UART uart(115200, 8, 0, 0, 1);
 
     // cout << "Loopback transmission test (conf = 115200 8N1):";
     //    uart.loopback(true);
@@ -45,7 +47,7 @@ int main()
         if(c != i)
             cout << " failed (" << c << ", should be " << i << ")!" << endl;
     }
-    cout << " passed!" << endl; */
+    cout << " passed!" << endl;
     
     return 0;
 }
