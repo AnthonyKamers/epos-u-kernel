@@ -2,6 +2,7 @@
 
 #include <utility/ostream.h>
 #include <machine/riscv/riscv_uart.h>
+#include <machine/riscv/riscv_qspi.h>
 
 using namespace EPOS;
 
@@ -9,12 +10,21 @@ int main()
 {
     OStream cout;
 
-    cout << "PC_UART test\n" << endl;
+    cout << "QSPI test\n" << endl;
 
-    SiFive_UART uart(115200, 8, 0, 0, 1);
+    QSPI myQspi();
 
-  // cout << "Loopback transmission test (conf = 115200 8N1):";
-//    uart.loopback(true);
+    for(int i = 0; i < 256; i++) {
+      myQspi.put(i);
+      int c = myQspi.get();
+      if(c != i)
+        cout << " failed (" << c << ", should be " << i << ")!" << endl;
+    }
+
+    /* SiFive_UART uart(115200, 8, 0, 0, 1);
+
+    // cout << "Loopback transmission test (conf = 115200 8N1):";
+    //    uart.loopback(true);
 
     for(int i = 0; i < 256; i++) {
         uart.txd(i);
@@ -26,7 +36,7 @@ int main()
 
     cout << "Link transmission test (conf = 9200 8N1):";
     uart.config(9600, 8, 0, 1);
-  // uart.loopback(false);
+    // uart.loopback(false);
 
     for(int i = 0; i < 256; i++) {
         uart.txd(i);
@@ -35,7 +45,7 @@ int main()
         if(c != i)
             cout << " failed (" << c << ", should be " << i << ")!" << endl;
     }
-    cout << " passed!" << endl;
+    cout << " passed!" << endl; */
     
     return 0;
 }
