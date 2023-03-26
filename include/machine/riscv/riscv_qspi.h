@@ -67,7 +67,7 @@ public:
 
   int get() {
     while(!rxd_ok());
-    return (reg(RXDATA) & 0xFF000000);
+    return (reg(RXDATA) & 0xFF);
   }
 
   bool try_get(int * data) {
@@ -84,7 +84,7 @@ public:
 
   void put(int data) {
     while(!txd_ok()) {
-      reg(TXDATA) = data;
+      reg(TXDATA) = (reg(TXDATA) & ~0xFF ) | (data & 0xFF);
     }
   }
 
