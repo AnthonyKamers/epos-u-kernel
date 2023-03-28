@@ -67,7 +67,7 @@ public:
   }
 
   void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
-    reg(SCKDIV) = 0x3; // default reset
+    reg(SCKDIV) = (((DIV_ROUND_UP(Traits<SPI>::CLOCK, ((2 * clock) -1))) & 0xFFF) | (~0xFFF & reg(SCKDIV)));
 
     switch (mode) {
         case 0:
