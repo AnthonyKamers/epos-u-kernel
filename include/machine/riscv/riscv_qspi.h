@@ -12,52 +12,78 @@
 
 __BEGIN_SYS
 
-class QSPI: public SPI_Common 
+class QSPI: private SPI_Common
 {
+private:
+    static const unsigned int CLOCK = Traits<SPI>::CLOCK;
+    static const unsigned DEF_PROTOCOL = Traits<SPI>::DEF_PROTOCOL;
+    static const unsigned DEF_MODE = Traits<SPI>::DEF_MODE;
+    static const unsigned DEF_BIT_RATE = Traits<SPI>::DEF_BIT_RATE;
+    static const unsigned DEF_DATA_BITS = Traits<SPI>::DEF_DATA_BITS;
+
 public:
       // SPI registers offsets from SPI_BASE
     enum {
-        SCKDIV  = 0x00, // Clock divisor register
-        SCKMODE = 0x04, // SPI mode and control register
+        SCKDIV  = 0x00, // Serial Clock divisor register    (Serial clock divisor)
+        SCKMODE = 0x04, // SPI mode and control register    (Serial clock mode)
         CSID    = 0x10, // Chip select ID register
         CSDEF   = 0x14, // Chip select default register
-        CSMODE  = 0x18, // Chip select mode register
+        CSMODE  = 0x18, // Chip select mode register        (Chip select mode)
         DELAY0  = 0x28, // Delay control register 0
         DELAY1  = 0x2c, // Delay control register 1
         FMT     = 0x40, // Frame format
-        TXDATA  = 0x48, // Transmit data register
-        RXDATA  = 0x4c, // Receive data register
+        TXDATA  = 0x48, // Transmit data register           (Transfer FIFO data)
+        RXDATA  = 0x4c, // Receive data register            (Received FIFO data)
         TXMARK  = 0x50, // Transmit watermark register
         RXMARK  = 0x54, // Receive watermark register
         FCTRL   = 0x60, // Flash interface control register
-        FFMT     = 0x64, // Flash interface timing register
-        IE      = 0x70, // Interrupt enable register
-        IP      = 0x74, // Interrupt pending register
-        DIV     = 0x80  // Set the SPI clock frequency
+        FFMT    = 0x64, // Flash interface timing register
+        IE      = 0x70, // Interrupt enable register        (Interrupt enable)
+        IP      = 0x74, // Interrupt pending register       (Interrupt pending)
     };
+
     // Useful bits from multiple registers
     enum {
-      SCK_PHA = 0b0,
-      SCK_POL = 0b1,
-      MODE_QUAD = 0b10,
-      MODE_DUAL = 0b01,
-      MODE_SINGLE = 0b00
+        SCK_DIV = 0x3,
+        FMT_FLASH = 0x00080008,
+        FMT_NON_FLASH = 0x00080000,
+
+        SCK_PHA = 0b0,
+        SCK_POL = 0b1,
+        MODE_QUAD = 0b10,
+        MODE_DUAL = 0b01,
+        MODE_SINGLE = 0b00
     };
 private:
-  static volatile CPU::Reg32 & reg(unsigned int o) { return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI0_BASE)[o / sizeof(CPU::Reg32)]; }
+  static volatile CPU::Reg32 & reg(unsigned int o) {
+      return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI0_BASE)[o / sizeof(CPU::Reg32)];
+  }
 
 public:
-  QSPI(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
+  QSPI(unsigned int clock = CLOCK, unsigned int protocol = DEF_PROTOCOL, unsigned int mode = DEF_MODE,
+       unsigned int bit_rate = DEF_BIT_RATE, unsigned int data_bits = DEF_DATA_BITS)
+   {
     config(clock, protocol, mode, bit_rate, data_bits);
   }
+
   void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
-    reg(SCKDIV) = DIV_ROUND_UP(clock >> 1, clock) - 1 & 0xfffU; // change second clock to slave (probably)
-    unsigned int fmt = 0;
-    fmt |= MODE_QUAD << 30; // proto
-    fmt |= 1 << 29; // endian
-    // dir is 0
-    fmt |= (0xFF & data_bits) << 12; // len
-    reg(FMT) = fmt; 
+    reg(SCKDIV) = 0x3; // default reset
+
+    switch (mode) {
+        case 0:
+            reg(FMT) = FMT_FLASH;
+            break;
+        case 1:
+            reg(FMT) = FMT_NON_FLASH;
+            break;
+    }
+
+//    unsigned int fmt = 0;
+//    fmt |= MODE_QUAD << 30; // proto
+//    fmt |= 1 << 29; // endian
+//    // dir is 0
+//    fmt |= (0xFF & data_bits) << 12; // len
+//    reg(FMT) = fmt;
   }
   
 

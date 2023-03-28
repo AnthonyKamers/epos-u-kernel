@@ -79,6 +79,15 @@ template <> struct Traits<UART>: public Traits<Machine_Common>
     static const unsigned int DEF_STOP_BITS = 1;
 };
 
+template<> struct Traits<SPI>: public Traits<Machine_Common>
+{
+    static const unsigned int CLOCK = 22729000;
+    static const unsigned DEF_PROTOCOL = 0;
+    static const unsigned DEF_MODE = 0;
+    static const unsigned DEF_BIT_RATE = 0;
+    static const unsigned DEF_DATA_BITS = 0;
+};
+
 template<> struct Traits<Serial_Display>: public Traits<Machine_Common>
 {
     static const bool enabled = (Traits<Build>::EXPECTED_SIMULATION_TIME != 0);
