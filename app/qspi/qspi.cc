@@ -1,53 +1,26 @@
 // EPOS PC UART Mediator Test Program
 
 #include <utility/ostream.h>
-#include <machine/riscv/riscv_uart.h>
-#include <machine/riscv/riscv_qspi.h>
+//#include <machine/riscv/riscv_uart.h>
+//#include <machine/riscv/riscv_qspi.h>
+#include <machine.h>
 
 using namespace EPOS;
+OStream cout;
 
 int main()
 {
-    OStream cout;
+    cout << "Teste QSPI \n" << endl;
 
-    cout << "QSPI test\n" << endl;
-
-    QSPI myQspi(22729000, 0, 0, 4, 4);
+    QSPI qspi(22729000, 0, 0, 4, 4);
 
     for(int i = 0; i < 256; i++) {
-      myQspi.put(i);
-      int c = myQspi.get();
+        qspi.put(i);
+      int c = qspi.get();
       if(c != i)
         cout << " failed (" << c << ", should be " << i << ")!" << endl;
     }
 
-    cout << "UART test\n" << endl;
 
-    SiFive_UART uart(115200, 8, 0, 0, 1);
-
-    // cout << "Loopback transmission test (conf = 115200 8N1):";
-    //    uart.loopback(true);
-
-    for(int i = 0; i < 256; i++) {
-        uart.txd(i);
-        int c = uart.rxd();
-        if(c != i)
-            cout << " failed (" << c << ", should be " << i << ")!" << endl;
-    }
-    cout << " passed!" << endl;
-
-    cout << "Link transmission test (conf = 9200 8N1):";
-    uart.config(9600, 8, 0, 1);
-    // uart.loopback(false);
-
-    for(int i = 0; i < 256; i++) {
-        uart.txd(i);
-        for(int j = 0; j < 0xffffff; j++);
-        int c = uart.rxd();
-        if(c != i)
-            cout << " failed (" << c << ", should be " << i << ")!" << endl;
-    }
-    cout << " passed!" << endl;
-    
     return 0;
 }

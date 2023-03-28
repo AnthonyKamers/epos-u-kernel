@@ -462,7 +462,7 @@ struct Traits_Tokens: public Transducer_Event, public System_Event, public PMU_E
     enum {LITTLE, BIG};
 
     // Serial display engines
-    enum {UART, USB};
+    enum {UART, USB, QSPI};
 
     // Life span multipliers
     enum {FOREVER = 0, SECOND = 1, MINUTE = 60, HOUR = 3600, DAY = 86400, WEEK = 604800, MONTH = 2592000, YEAR = 31536000};

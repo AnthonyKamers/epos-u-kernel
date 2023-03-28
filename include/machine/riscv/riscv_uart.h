@@ -34,7 +34,7 @@ public:
     enum {
         FULL    =    1 << 31,   // TXDATA, TX FIFO full
         EMPTY   =    1 << 31,   // RXDATA, RX FIFO empty
-        DATA    = 0xff << 0,
+        DATA    =    0xff << 0, // DATA
         TXEN    =    1 <<  0,   // TXCTRL, TX enable
         NSTOP   =    1 <<  1,   // TXCTRL, stop bits (0 -> 1 or 1 -> 2)
         TXCNT   =    7 << 16,   // TXCTRL, TX interrupt threshold (RXWM = (len(FIFO) < TXCNT))

@@ -39,6 +39,10 @@ public:
         ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
         FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
 
+        SPI0_BASE       = 0x10040000,   // QSPI 0 (Flash)
+        SPI1_BASE       = 0x10041000,   // QSPI 1 (Flash)
+        SPI2_BASE       = 0x10050000,   // QSPI 2
+
         // Physical Memory at Boot
         BOOT            = Traits<Machine>::BOOT,
         IMAGE           = Traits<Machine>::IMAGE,
