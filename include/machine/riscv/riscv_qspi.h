@@ -68,22 +68,12 @@ public:
 
   void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
     reg(SCKDIV) = (((DIV_ROUND_UP(Traits<SPI>::CLOCK, ((2 * clock) -1))) & 0xFFF) | (~0xFFF & reg(SCKDIV)));
-
-    switch (mode) {
-        case 0:
-            reg(FMT) = FMT_FLASH;
-            break;
-        case 1:
-            reg(FMT) = FMT_NON_FLASH;
-            break;
-    }
-
-//    unsigned int fmt = 0;
-//    fmt |= MODE_QUAD << 30; // proto
-//    fmt |= 1 << 29; // endian
-//    // dir is 0
-//    fmt |= (0xFF & data_bits) << 12; // len
-//    reg(FMT) = fmt;
+    unsigned int fmt = 0;
+    fmt |= MODE_QUAD << 30; // proto
+    fmt |= 1 << 29; // endian
+    // dir is 0
+    fmt |= (0xFF & data_bits) << 12; // len
+    reg(FMT) = fmt;
   }
   
 
