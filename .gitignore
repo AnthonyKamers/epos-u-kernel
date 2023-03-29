@@ -1,6 +1,7 @@
 # IDE
 .idea
-
+.cache
+compile_commands.json
 # C output generated files
 **.o
 
