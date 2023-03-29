@@ -2,6 +2,7 @@
 
 #ifndef __riscv_qspi_h
 #define __riscv_qspi_h
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 #include <architecture/cpu.h>
 #include <machine/spi.h>
