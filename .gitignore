@@ -17,3 +17,4 @@ hello*
 
 # Git Ignore of other directories
 .gitignore
+img

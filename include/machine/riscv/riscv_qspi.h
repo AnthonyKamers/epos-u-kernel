@@ -2,9 +2,6 @@
 
 #ifndef __riscv_qspi_h
 #define __riscv_qspi_h
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-#define SIFIVE_SPI_FMT_LEN(x)            ((unsigned int)(x) << 16)
-#define SIFIVE_SPI_FMT_LEN_MASK          (0xfU << 16)
 
 #include <architecture/cpu.h>
 #include <machine/spi.h>
@@ -14,6 +11,10 @@ __BEGIN_SYS
 
 class QSPI: private SPI_Common
 {
+private:
+    typedef CPU::Reg8 Reg8;
+    typedef CPU::Reg32 Reg32;
+
 private:
     static const unsigned int CLOCK = Traits<SPI>::CLOCK;
     static const unsigned DEF_PROTOCOL = Traits<SPI>::DEF_PROTOCOL;
@@ -47,6 +48,11 @@ public:
         SCK_DIV = 0x3,
         FMT_FLASH = 0x00080008,
         FMT_NON_FLASH = 0x00080000,
+        RXD_EMPTY = 1 << 31,
+        RXD_DATA = 0xFF << 0,
+        TXD_FULL = 1 << 31,
+
+        TXWM = 1 <<  0,   // IE/IP, TX water mark
 
         SCK_PHA = 0b0,
         SCK_POL = 0b1,
@@ -54,9 +60,12 @@ public:
         MODE_DUAL = 0b01,
         MODE_SINGLE = 0b00
     };
+public:
+    Reg32 rxd_now;
+
 private:
   static volatile CPU::Reg32 & reg(unsigned int o) {
-      return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI0_BASE)[o / sizeof(CPU::Reg32)];
+      return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI2_BASE)[o / sizeof(CPU::Reg32)];
   }
 
 public:
@@ -74,16 +83,26 @@ public:
     // dir is 0
     fmt |= (0xFF & data_bits) << 12; // len
     reg(FMT) = fmt;
+    reg(TXMARK) = mode << 0;
+    reg(RXMARK) = 0x0 << 0;
   }
-  
+
+  int check_ie() {
+      return reg(IE);
+  }
+
+  int check_ip() {
+      return reg(IP);
+  }
 
   bool rxd_ok() {
-    return (reg(RXDATA) & 1);
+      rxd_now = reg(RXDATA);
+      return !(reg(RXDATA) & RXD_EMPTY);
   }
 
   int get() {
     while(!rxd_ok());
-    return (reg(RXDATA) & 0xFF);
+    return reg(RXDATA);
   }
 
   bool try_get(int * data) {
@@ -95,13 +114,14 @@ public:
   }
   
   bool txd_ok() {
-    return (reg(TXDATA) & 1);
+    return !(reg(TXDATA) & TXD_FULL);
   }
 
   void put(int data) {
-    while(!txd_ok()) {
-      reg(TXDATA) = (reg(TXDATA) & ~0xFF ) | (data & 0xFF);
-    }
+    while(!txd_ok());
+
+    Reg8 data8 = data;
+    reg(TXDATA) = (data8 & 0xFF);
   }
 
   bool try_put(int data) {
@@ -124,7 +144,7 @@ public:
     return 0;
   }
 
-  void flush();
+  void flush() { while(!(reg(IP) & TXWM)); }
   bool ready_to_get() { return rxd_ok(); };
   bool ready_to_put() { return txd_ok(); };
 
