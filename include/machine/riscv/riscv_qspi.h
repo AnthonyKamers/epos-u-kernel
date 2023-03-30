@@ -46,15 +46,16 @@ public:
 
     // Useful bits from multiple registers
     enum {
-        SCK_DIV = 0x3,
-        FMT_FLASH = 0x00080008,
-        FMT_NON_FLASH = 0x00080000,
-        RXD_EMPTY = 1 << 31,
-        RXD_DATA = 0xFF << 0,
-        TXD_FULL = 1 << 31,
+        SCK_DIV = 0x3,              // default divisor
+        FMT_FLASH = 0x00080008,     // default fmt flash
+        FMT_NON_FLASH = 0x00080000, // default fmt non flash
+        RXD_EMPTY = 1 << 31,        // when it is ready to receive
+        TXD_FULL = 1 << 31,         // when it is ready to put
+        DATA_MASK = 0xFF << 0,      // DATA mask (8 first bits)
 
         TXWM = 1 <<  0,   // IE/IP, TX water mark
 
+        // MSB
         SCK_PHA = 0b0,
         SCK_POL = 0b1,
         MODE_QUAD = 0b10,
@@ -62,7 +63,7 @@ public:
         MODE_SINGLE = 0b00
     };
 public:
-    Reg32 rxd_now;
+    Reg8 rxd_now;
 
 private:
   static volatile CPU::Reg32 & reg(unsigned int o) {
@@ -78,14 +79,18 @@ public:
 
   void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
     reg(SCKDIV) = (((DIV_ROUND_UP(Traits<SPI>::CLOCK, ((2 * clock) -1))) & 0xFFF) | (~0xFFF & reg(SCKDIV)));
+
+    // frame format
     unsigned int fmt = 0;
-    fmt |= MODE_QUAD << 30; // proto
-    fmt |= 1 << 29; // endian
-    // dir is 0
-    fmt |= (0xFF & data_bits) << 12; // len
+    fmt |= protocol << 0;       // single, dual, quad (default = quad)
+    fmt |= 0 << 2;              // endian = LSB
+    fmt |= mode << 3;           // direction io = flash, non-flash (default = non-flash)
+    fmt |= data_bits << 16;     // length bits to put/receive per frame
     reg(FMT) = fmt;
-    reg(TXMARK) = mode << 0;
-    reg(RXMARK) = 0x0 << 0;
+
+    // watermarks (to enable interrupts)
+    reg(TXMARK) = mode << 0; // flash / non-flash
+    reg(RXMARK) = 0x0 << 0;  // reset to enable
   }
 
   int check_ie() {
@@ -98,12 +103,15 @@ public:
 
   bool rxd_ok() {
       rxd_now = reg(RXDATA);
-      return !(reg(RXDATA) & RXD_EMPTY);
+      return !(rxd_now & RXD_EMPTY);
   }
 
   int get() {
-    while(!rxd_ok());
-    return reg(RXDATA);
+      // get is not working! the right version would be having a loop while(!rxd_ok());
+      // but as it is not receiving correctly, it was changed this way to show
+      // more details about the SPI implementation
+      bool rxd_ok_now = rxd_ok();
+      return (rxd_ok_now ? rxd_now : reg(RXDATA)) & DATA_MASK;
   }
 
   bool try_get(int * data) {
@@ -120,9 +128,7 @@ public:
 
   void put(int data) {
     while(!txd_ok());
-
-    Reg8 data8 = data;
-    reg(TXDATA) = (data8 & 0xFF);
+    reg(TXDATA) = (data & DATA_MASK);
   }
 
   bool try_put(int data) {

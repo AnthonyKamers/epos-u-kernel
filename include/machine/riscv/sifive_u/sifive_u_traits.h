@@ -81,11 +81,11 @@ template <> struct Traits<UART>: public Traits<Machine_Common>
 
 template<> struct Traits<SPI>: public Traits<Machine_Common>
 {
-    static const unsigned int CLOCK = 100000; // mmc-spi-slot max-frequency
-    static const unsigned DEF_PROTOCOL = 0;
-    static const unsigned DEF_MODE = 1; // non flash
-    static const unsigned DEF_BIT_RATE = 0;
-    static const unsigned DEF_DATA_BITS = 0;
+    static const unsigned int CLOCK = 500000;    // clock-rate/2 (1GHz / 2 = 500MHz) -> sifive_u manual
+    static const unsigned DEF_PROTOCOL = 0x2;   // QUAD mode
+    static const unsigned DEF_MODE = 0;         // non flash
+    static const unsigned DEF_BIT_RATE = 0;     //
+    static const unsigned DEF_DATA_BITS = 0x8;  // 8 bits per time
 };
 
 template<> struct Traits<Serial_Display>: public Traits<Machine_Common>
