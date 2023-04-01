@@ -38,6 +38,8 @@ class System
 
 public:
     static System_Info * const info() { assert(_si); return _si; }
+    static Heap * _shared_heap;
+    static Segment * _shared_segment;
 
 private:
     static void init();
@@ -92,6 +94,16 @@ inline void * operator new(size_t bytes, const EPOS::System_Allocator & allocato
 
 inline void * operator new[](size_t bytes, const EPOS::System_Allocator & allocator) {
     return _SYS::System::_heap->alloc(bytes);
+}
+
+inline void * operator new(size_t bytes, const EPOS::Shared_Allocator & allocator) {
+    __USING_SYS;
+    return Address_Space(MMU::current()).attach(System::_shared_segment);
+}
+
+inline void * operator new[](size_t bytes, const EPOS::Shared_Allocator & allocator) {
+    __USING_SYS;
+    return Address_Space(MMU::current()).attach(System::_shared_segment);
 }
 
 // Delete cannot be declared inline due to virtual destructors
