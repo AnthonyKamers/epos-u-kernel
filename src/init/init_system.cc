@@ -37,9 +37,7 @@ public:
             System::_heap = new (&System::_preheap[0]) Heap(MMU::alloc(MMU::pages(HEAP_SIZE)), HEAP_SIZE);
         
         // TODO traits
-        System::_shared_segment = new (&System::_preheap[0]) Segment(HEAP_SIZE, Segment::Flags::SHR);
-        System::_shared_heap = new (&System::_preheap[0]) Heap(MMU::alloc(MMU::pages(HEAP_SIZE)), HEAP_SIZE);
-        
+        Shared_Memory::_shared_segment = new (&Shared_Memory::_preheap[0]) Segment(HEAP_SIZE, Segment::Flags::SHR);
         db<Init>(INF) << "Initializing the machine: " << endl;
         Machine::init();
 

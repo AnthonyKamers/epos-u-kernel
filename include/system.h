@@ -24,6 +24,20 @@ private:
     static Heap * _heap;
 };
 
+class Shared_Memory {
+    friend class Init_System; // Init_System iniciará a heap e segmento
+    friend void * ::malloc(size_t);
+    friend void ::free(void*);
+    friend void * ::operator new(size_t, const EPOS::Shared_Allocator&);
+    friend void * ::operator new[](size_t, const EPOS::Shared_Allocator&);
+    friend void ::operator delete(void*);
+    friend void ::operator delete[](void*);
+
+    private:
+    static char _preheap[(Traits<System>::multiheap ? sizeof(Segment) : 0) + sizeof(Heap)];
+    static Segment * _shared_segment;
+};
+
 class System
 {
     friend class Init_System;                                                   // for _heap
@@ -38,8 +52,6 @@ class System
 
 public:
     static System_Info * const info() { assert(_si); return _si; }
-    static Heap * _shared_heap;
-    static Segment * _shared_segment;
 
 private:
     static void init();
@@ -98,12 +110,12 @@ inline void * operator new[](size_t bytes, const EPOS::System_Allocator & alloca
 
 inline void * operator new(size_t bytes, const EPOS::Shared_Allocator & allocator) {
     __USING_SYS;
-    return Address_Space(MMU::current()).attach(System::_shared_segment);
+    return Address_Space(MMU::current()).attach(Shared_Memory::_shared_segment);
 }
 
 inline void * operator new[](size_t bytes, const EPOS::Shared_Allocator & allocator) {
     __USING_SYS;
-    return Address_Space(MMU::current()).attach(System::_shared_segment);
+    return Address_Space(MMU::current()).attach(Shared_Memory::_shared_segment);
 }
 
 // Delete cannot be declared inline due to virtual destructors
