@@ -1,0 +1,1027 @@
+Index: app/qspi/makefile
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/qspi/makefile b/app/qspi/makefile
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/qspi/makefile	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+Index: app/qspi/qspi.cc
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/qspi/qspi.cc b/app/qspi/qspi.cc
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/qspi/qspi.cc	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,63 @@
++// EPOS PC QSPI Mediator Test Program
++
++#include <utility/ostream.h>
++#include <machine/riscv/riscv_spi.h>
++#include <machine.h>
++
++using namespace EPOS;
++
++OStream cout;
++SPI qspi;
++
++void loop_test() {
++    for (int i = 0; i < 3; i++) {
++        bool ready = qspi.ready_to_put();
++
++        int ie = qspi.check_ie();
++        int ip = qspi.check_ip();
++
++        cout << "ie before: " << ie << endl;
++        cout << "ip before: " << ip << endl;
++
++        if (ready) {
++            cout << "ready to put value: " << i << endl;
++            qspi.put(i);
++
++            ie = qspi.check_ie();
++            ip = qspi.check_ip();
++
++            cout << "ie after put: " << ie << endl;
++            cout << "ip after put: " << ip << endl;
++
++            if (ip == 2)
++                cout << "IP after put = 2 indicates it was written successfully to the FIFO. A interruption is set waiting to receive it." << endl;
++
++            bool ready_get = qspi.ready_to_get();
++            cout << "is it ready to get value from FIFO: " << ready_get << endl;
++
++            int get = qspi.get();
++            cout << "get: " << get << endl;
++
++            // after get
++            ie = qspi.check_ie();
++            ip = qspi.check_ip();
++
++            cout << "ie after get: " << ie << endl;
++            cout << "ip after get: " << ip << endl;
++
++            if (ip == 0)
++                cout << "IP after get = 0 indicates something was written from the register RXData successfully, so it is reset to no interruptions (put/get)." << endl;
++
++            cout << endl;
++        } else
++            cout << "not ready to put: ERROR" << endl;
++    }
++}
++
++int main()
++{
++    cout << "QSPI general test \n" << endl;
++    loop_test();
++
++    return 0;
++}
+Index: app/qspi/qspi_traits.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/qspi/qspi_traits.h b/app/qspi/qspi_traits.h
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/qspi/qspi_traits.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,147 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = false;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = true;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = false;
++    static const bool trace   = false;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++        __BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Application>::MAX_THREADS > 1);
++    static const bool multiheap = Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool preemptive = true;
++    static const unsigned int QUANTUM = 100000; // us
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+Index: app/uart_example/makefile
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/uart_example/makefile b/app/uart_example/makefile
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/uart_example/makefile	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+Index: app/uart_example/uart_example.cc
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/uart_example/uart_example.cc b/app/uart_example/uart_example.cc
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/uart_example/uart_example.cc	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,25 @@
++#include <utility/ostream.h>
++#include <machine.h>
++
++using namespace EPOS;
++UART uart;
++OStream cout;
++
++int main()
++{
++    cout << "Teste UART\n" << endl;
++
++    while (true) {
++        // colocar como exemplo
++        uart.put('a');
++
++        // ler do teclado
++        char c = uart.get();
++
++        cout << "Lido: " << c << endl;
++    }
++
++    cout << " passed!" << endl;
++
++    return 0;
++}
+Index: app/uart_example/uart_example_traits.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/uart_example/uart_example_traits.h b/app/uart_example/uart_example_traits.h
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/app/uart_example/uart_example_traits.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,147 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = false;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = true;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = false;
++    static const bool trace   = false;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++        __BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Application>::MAX_THREADS > 1);
++    static const bool multiheap = Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool preemptive = true;
++    static const unsigned int QUANTUM = 100000; // us
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+Index: include/machine/riscv/sifive_u/sifive_u_memory_map.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/include/machine/riscv/sifive_u/sifive_u_memory_map.h b/include/machine/riscv/sifive_u/sifive_u_memory_map.h
+--- a/include/machine/riscv/sifive_u/sifive_u_memory_map.h	(revision 286fb4c2ac202120b3b500981bea664f3fffe139)
++++ b/include/machine/riscv/sifive_u/sifive_u_memory_map.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -39,6 +39,10 @@
+         ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
+         FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
+ 
++        SPI0_BASE       = 0x10040000,   // QSPI 0 (Flash)
++        SPI1_BASE       = 0x10041000,   // QSPI 1 (Flash)
++        SPI2_BASE       = 0x10050000,   // QSPI 2
++
+         // Physical Memory at Boot
+         BOOT            = Traits<Machine>::BOOT,
+         IMAGE           = Traits<Machine>::IMAGE,
+Index: include/machine/riscv/sifive_u/sifive_u_traits.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/include/machine/riscv/sifive_u/sifive_u_traits.h b/include/machine/riscv/sifive_u/sifive_u_traits.h
+--- a/include/machine/riscv/sifive_u/sifive_u_traits.h	(revision 286fb4c2ac202120b3b500981bea664f3fffe139)
++++ b/include/machine/riscv/sifive_u/sifive_u_traits.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -90,12 +90,12 @@
+ {
+     static const unsigned int UNITS = 3;
+ 
+-    static const unsigned int CLOCK = Traits<Machine>::TLCLK;
++    static const unsigned int CLOCK = Traits<Machine>::TLCLK; // clock-rate/2 (1GHz / 2 = 500MHz) -> sifive_u manual
+ 
+     static const unsigned int DEF_UNIT = 0;
+-    static const unsigned int DEF_PROTOCOL = 0;
+-    static const unsigned int DEF_MODE = 0;
+-    static const unsigned int DEF_DATA_BITS = 8;
++    static const unsigned int DEF_PROTOCOL = 0x2;   // QUAD mode
++    static const unsigned int DEF_MODE = 0;         // non flash
++    static const unsigned int DEF_DATA_BITS = 8;    // 8 bits per time
+     static const unsigned int DEF_BIT_RATE = 250000;
+ };
+ 
+Index: include/machine/riscv/riscv_spi.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/include/machine/riscv/riscv_spi.h b/include/machine/riscv/riscv_spi.h
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/include/machine/riscv/riscv_spi.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,166 @@
++// EPOS RISC-V QSPI Mediator Declarations
++
++#ifndef __riscv_spi_h
++#define __riscv_spi_h
++#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
++
++#include <architecture/cpu.h>
++#include <machine/spi.h>
++#include <system/memory_map.h>
++
++__BEGIN_SYS
++
++class SPI: private SPI_Common
++{
++private:
++    typedef CPU::Reg8 Reg8;
++    typedef CPU::Reg32 Reg32;
++
++private:
++    static const unsigned int CLOCK = Traits<SPI>::CLOCK;
++    static const unsigned DEF_PROTOCOL = Traits<SPI>::DEF_PROTOCOL;
++    static const unsigned DEF_MODE = Traits<SPI>::DEF_MODE;
++    static const unsigned DEF_BIT_RATE = Traits<SPI>::DEF_BIT_RATE;
++    static const unsigned DEF_DATA_BITS = Traits<SPI>::DEF_DATA_BITS;
++
++public:
++      // SPI registers offsets from SPI_BASE
++    enum {
++        SCKDIV  = 0x00, // Serial Clock divisor register    (Serial clock divisor)
++        SCKMODE = 0x04, // SPI mode and control register    (Serial clock mode)
++        CSID    = 0x10, // Chip select ID register
++        CSDEF   = 0x14, // Chip select default register
++        CSMODE  = 0x18, // Chip select mode register        (Chip select mode)
++        DELAY0  = 0x28, // Delay control register 0
++        DELAY1  = 0x2c, // Delay control register 1
++        FMT     = 0x40, // Frame format
++        TXDATA  = 0x48, // Transmit data register           (Transfer FIFO data)
++        RXDATA  = 0x4c, // Receive data register            (Received FIFO data)
++        TXMARK  = 0x50, // Transmit watermark register
++        RXMARK  = 0x54, // Receive watermark register
++        FCTRL   = 0x60, // Flash interface control register
++        FFMT    = 0x64, // Flash interface timing register
++        IE      = 0x70, // Interrupt enable register        (Interrupt enable)
++        IP      = 0x74, // Interrupt pending register       (Interrupt pending)
++    };
++
++    // Useful bits from multiple registers
++    enum {
++        SCK_DIV = 0x3,              // default divisor
++        FMT_FLASH = 0x00080008,     // default fmt flash
++        FMT_NON_FLASH = 0x00080000, // default fmt non flash
++        RXD_EMPTY = 1 << 31,        // when it is ready to receive
++        TXD_FULL = 1 << 31,         // when it is ready to put
++        DATA_MASK = 0xFF << 0,      // DATA mask (8 first bits)
++
++        TXWM = 1 <<  0,   // IE/IP, TX water mark
++
++        // MSB
++        SCK_PHA = 0b0,
++        SCK_POL = 0b1,
++        MODE_QUAD = 0b10,
++        MODE_DUAL = 0b01,
++        MODE_SINGLE = 0b00
++    };
++public:
++    Reg8 rxd_now;
++
++private:
++  static volatile CPU::Reg32 & reg(unsigned int o) {
++      return reinterpret_cast<volatile CPU::Reg32 *>(Memory_Map::SPI2_BASE)[o / sizeof(CPU::Reg32)];
++  }
++
++public:
++  SPI(unsigned int clock = CLOCK, unsigned int protocol = DEF_PROTOCOL, unsigned int mode = DEF_MODE,
++       unsigned int bit_rate = DEF_BIT_RATE, unsigned int data_bits = DEF_DATA_BITS)
++   {
++    config(clock, protocol, mode, bit_rate, data_bits);
++  }
++
++  void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int bit_rate, unsigned int data_bits) {
++    reg(SCKDIV) = (((DIV_ROUND_UP(Traits<SPI>::CLOCK, ((2 * clock) -1))) & 0xFFF) | (~0xFFF & reg(SCKDIV)));
++
++    // frame format
++    unsigned int fmt = 0;
++    fmt |= protocol << 0;       // single, dual, quad (default = quad)
++    fmt |= 0 << 2;              // endian = LSB
++    fmt |= mode << 3;           // direction io = flash, non-flash (default = non-flash)
++    fmt |= data_bits << 16;     // length bits to put/receive per frame
++    reg(FMT) = fmt;
++
++    // watermarks (to enable interrupts)
++    reg(TXMARK) = mode << 0; // flash / non-flash
++    reg(RXMARK) = 0x0 << 0;  // reset to enable
++  }
++
++  int check_ie() {
++      return reg(IE);
++  }
++
++  int check_ip() {
++      return reg(IP);
++  }
++
++  bool rxd_ok() {
++      rxd_now = reg(RXDATA);
++      return !(rxd_now & RXD_EMPTY);
++  }
++
++  int get() {
++      // get is not working! the right version would be having a loop while(!rxd_ok());
++      // but as it is not receiving correctly, it was changed this way to show
++      // more details about the SPI implementation
++      bool rxd_ok_now = rxd_ok();
++      return (rxd_ok_now ? rxd_now : reg(RXDATA)) & DATA_MASK;
++  }
++
++  bool try_get(int * data) {
++    if (rxd_ok()) {
++      *data = get();
++      return true;
++    }
++    return false;
++  }
++  
++  bool txd_ok() {
++    return !(reg(TXDATA) & TXD_FULL);
++  }
++
++  void put(int data) {
++    while(!txd_ok());
++    reg(TXDATA) = (data & DATA_MASK);
++  }
++
++  bool try_put(int data) {
++    if (txd_ok()) {
++      put(data);
++      return true;
++    }
++    return false;
++  }
++  
++  int read(char * data, unsigned int max_size) {
++    for(unsigned int i = 0; i < max_size; i++)
++      data[i] = get();
++    return 0;
++  }
++  
++  int write(const char * data, unsigned int size) {
++    for(unsigned int i = 0; i < size; i++)
++        put(data[i]);
++    return 0;
++  }
++
++  void flush() { while(!(reg(IP) & TXWM)); }
++  bool ready_to_get() { return rxd_ok(); };
++  bool ready_to_put() { return txd_ok(); };
++
++  void int_enable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true);
++  void int_disable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true);
++  
++};
++
++__END_SYS
++
++#endif
++
+Index: include/machine/riscv/riscv_uart.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/include/machine/riscv/riscv_uart.h b/include/machine/riscv/riscv_uart.h
+--- a/include/machine/riscv/riscv_uart.h	(revision 286fb4c2ac202120b3b500981bea664f3fffe139)
++++ b/include/machine/riscv/riscv_uart.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -34,7 +34,7 @@
+     enum {
+         FULL    =    1 << 31,   // TXDATA, TX FIFO full
+         EMPTY   =    1 << 31,   // RXDATA, RX FIFO empty
+-        DATA    = 0xff << 0,
++        DATA    =    0xff << 0, // DATA
+         TXEN    =    1 <<  0,   // TXCTRL, TX enable
+         NSTOP   =    1 <<  1,   // TXCTRL, stop bits (0 -> 1 or 1 -> 2)
+         TXCNT   =    7 << 16,   // TXCTRL, TX interrupt threshold (RXWM = (len(FIFO) < TXCNT))
+Index: include/system/traits.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/include/system/traits.h b/include/system/traits.h
+--- a/include/system/traits.h	(revision 286fb4c2ac202120b3b500981bea664f3fffe139)
++++ b/include/system/traits.h	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -462,7 +462,7 @@
+     enum {LITTLE, BIG};
+ 
+     // Serial display engines
+-    enum {UART, USB};
++    enum {UART, USB, SPI};
+ 
+     // Life span multipliers
+     enum {FOREVER = 0, SECOND = 1, MINUTE = 60, HOUR = 3600, DAY = 86400, WEEK = 604800, MONTH = 2592000, YEAR = 31536000};
+Index: diff.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/diff.txt b/diff.txt
+new file mode 100644
+--- /dev/null	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
++++ b/diff.txt	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -0,0 +1,252 @@
++diff --git a/app/qspi/qspi.cc b/app/qspi/qspi.cc
++index 05f7e09..35b4bbc 100644
++--- a/app/qspi/qspi.cc
+++++ b/app/qspi/qspi.cc
++@@ -1,13 +1,13 @@
++ // EPOS PC QSPI Mediator Test Program
++ 
++ #include <utility/ostream.h>
++-#include <machine/riscv/riscv_qspi.h>
+++#include <machine/riscv/riscv_spi.h>
++ #include <machine.h>
++ 
++ using namespace EPOS;
++ 
++ OStream cout;
++-QSPI qspi;
+++SPI qspi;
++ 
++ void loop_test() {
++     for (int i = 0; i < 3; i++) {
++diff --git a/app/qspi/qspi_traits.h b/app/qspi/qspi_traits.h
++index c37e541..0e396fe 100644
++--- a/app/qspi/qspi_traits.h
+++++ b/app/qspi/qspi_traits.h
++@@ -15,13 +15,13 @@ template<> struct Traits<Build>: public Traits_Tokens
++     static const unsigned int MODEL = SiFive_U;
++     static const unsigned int CPUS = 1;
++     static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++-    static const unsigned int EXPECTED_SIMULATION_TIME = 5; // s (0 => not simulated)
+++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++ 
++     // Default flags
++     static const bool enabled = true;
++     static const bool monitored = false;
++     static const bool debugged = true;
++-    static const bool hysterically_debugged = false;
+++    static const bool hysterically_debugged = true;
++ 
++     // Default aspects
++     typedef ALIST<> ASPECTS;
++@@ -89,7 +89,7 @@ __END_SYS
++ #include __ARCHITECTURE_TRAITS_H
++ #include __MACHINE_TRAITS_H
++ 
++-__BEGIN_SYS
+++        __BEGIN_SYS
++ 
++ 
++ // API Components
++@@ -104,6 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
++ {
++     static const unsigned int mode = Traits<Build>::MODE;
++     static const bool multithread = (Traits<Application>::MAX_THREADS > 1);
+++    static const bool multiheap = Traits<Scratchpad>::enabled;
++ 
++     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++     static const unsigned int DUTY_CYCLE = 1000000; // ppm
++@@ -118,12 +119,13 @@ template<> struct Traits<Thread>: public Traits<Build>
++ {
++     static const bool enabled = Traits<System>::multithread;
++     static const bool trace_idle = hysterically_debugged;
++-    static const unsigned int QUANTUM = 500000; // us
+++    static const bool preemptive = true;
+++    static const unsigned int QUANTUM = 100000; // us
++ };
++ 
++ template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++ {
++-    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
+++static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++ };
++ 
++ template<> struct Traits<Synchronizer>: public Traits<Build>
++@@ -136,6 +138,9 @@ template<> struct Traits<Alarm>: public Traits<Build>
++     static const bool visible = hysterically_debugged;
++ };
++ 
+++template<> struct Traits<Address_Space>: public Traits<Build> {};
+++
+++template<> struct Traits<Segment>: public Traits<Build> {};
++ 
++ __END_SYS
++ 
++diff --git a/app/uart_example/uart_example_traits.h b/app/uart_example/uart_example_traits.h
++index 6113e19..0e396fe 100644
++--- a/app/uart_example/uart_example_traits.h
+++++ b/app/uart_example/uart_example_traits.h
++@@ -89,7 +89,7 @@ __END_SYS
++ #include __ARCHITECTURE_TRAITS_H
++ #include __MACHINE_TRAITS_H
++ 
++-__BEGIN_SYS
+++        __BEGIN_SYS
++ 
++ 
++ // API Components
++@@ -104,6 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
++ {
++     static const unsigned int mode = Traits<Build>::MODE;
++     static const bool multithread = (Traits<Application>::MAX_THREADS > 1);
+++    static const bool multiheap = Traits<Scratchpad>::enabled;
++ 
++     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++     static const unsigned int DUTY_CYCLE = 1000000; // ppm
++@@ -118,12 +119,13 @@ template<> struct Traits<Thread>: public Traits<Build>
++ {
++     static const bool enabled = Traits<System>::multithread;
++     static const bool trace_idle = hysterically_debugged;
++-    static const unsigned int QUANTUM = 500000; // us
+++    static const bool preemptive = true;
+++    static const unsigned int QUANTUM = 100000; // us
++ };
++ 
++ template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++ {
++-    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
+++static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++ };
++ 
++ template<> struct Traits<Synchronizer>: public Traits<Build>
++@@ -136,6 +138,9 @@ template<> struct Traits<Alarm>: public Traits<Build>
++     static const bool visible = hysterically_debugged;
++ };
++ 
+++template<> struct Traits<Address_Space>: public Traits<Build> {};
+++
+++template<> struct Traits<Segment>: public Traits<Build> {};
++ 
++ __END_SYS
++ 
++diff --git a/include/machine/riscv/riscv_uart.h b/include/machine/riscv/riscv_uart.h
++index 73d02e7..2935db6 100644
++--- a/include/machine/riscv/riscv_uart.h
+++++ b/include/machine/riscv/riscv_uart.h
++@@ -34,7 +34,7 @@ public:
++     enum {
++         FULL    =    1 << 31,   // TXDATA, TX FIFO full
++         EMPTY   =    1 << 31,   // RXDATA, RX FIFO empty
++-        DATA    = 0xff << 0,
+++        DATA    =    0xff << 0, // DATA
++         TXEN    =    1 <<  0,   // TXCTRL, TX enable
++         NSTOP   =    1 <<  1,   // TXCTRL, stop bits (0 -> 1 or 1 -> 2)
++         TXCNT   =    7 << 16,   // TXCTRL, TX interrupt threshold (RXWM = (len(FIFO) < TXCNT))
++diff --git a/include/machine/riscv/sifive_u/sifive_u_memory_map.h b/include/machine/riscv/sifive_u/sifive_u_memory_map.h
++index e02d7bf..dcc4ed2 100644
++--- a/include/machine/riscv/sifive_u/sifive_u_memory_map.h
+++++ b/include/machine/riscv/sifive_u/sifive_u_memory_map.h
++@@ -39,6 +39,10 @@ public:
++         ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
++         FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
++ 
+++        SPI0_BASE       = 0x10040000,   // QSPI 0 (Flash)
+++        SPI1_BASE       = 0x10041000,   // QSPI 1 (Flash)
+++        SPI2_BASE       = 0x10050000,   // QSPI 2
+++
++         // Physical Memory at Boot
++         BOOT            = Traits<Machine>::BOOT,
++         IMAGE           = Traits<Machine>::IMAGE,
++diff --git a/include/machine/riscv/sifive_u/sifive_u_traits.h b/include/machine/riscv/sifive_u/sifive_u_traits.h
++index 6f78866..c18955e 100644
++--- a/include/machine/riscv/sifive_u/sifive_u_traits.h
+++++ b/include/machine/riscv/sifive_u/sifive_u_traits.h
++@@ -90,12 +90,12 @@ template <> struct Traits<SPI>: public Traits<Machine_Common>
++ {
++     static const unsigned int UNITS = 3;
++ 
++-    static const unsigned int CLOCK = Traits<Machine>::TLCLK;
+++    static const unsigned int CLOCK = Traits<Machine>::TLCLK; // clock-rate/2 (1GHz / 2 = 500MHz) -> sifive_u manual
++ 
++     static const unsigned int DEF_UNIT = 0;
++-    static const unsigned int DEF_PROTOCOL = 0;
++-    static const unsigned int DEF_MODE = 0;
++-    static const unsigned int DEF_DATA_BITS = 8;
+++    static const unsigned int DEF_PROTOCOL = 0x2;   // QUAD mode
+++    static const unsigned int DEF_MODE = 0;         // non flash
+++    static const unsigned int DEF_DATA_BITS = 8;    // 8 bits per time
++     static const unsigned int DEF_BIT_RATE = 250000;
++ };
++ 
++diff --git a/include/system/config.h b/include/system/config.h
++index 81c7dad..84cd952 100644
++--- a/include/system/config.h
+++++ b/include/system/config.h
++@@ -7,15 +7,15 @@
++ // ARCHITECTURE, MACHINE, AND APPLICATION SELECTION
++ // This section is generated automatically from makedefs by $EPOS/etc/makefile
++ //============================================================================
++-#define SMOD xxx
++-#define ARCH xxx
++-#define MACH xxx
++-#define MMOD xxx
++-#define APPL xxx
++-#define __mode_xxx__
++-#define __arch_xxx__
++-#define __mach_xxx__
++-#define __mmod_xxx__
+++#define SMOD library
+++#define ARCH rv64
+++#define MACH riscv
+++#define MMOD sifive_u
+++#define APPL qspi
+++#define __library__
+++#define __rv64__
+++#define __riscv__
+++#define __sifive_u__
++ 
++ //============================================================================
++ // NAMESPACES AND DEFINITIONS
++diff --git a/include/system/traits.h b/include/system/traits.h
++index a430f7a..ed5c568 100644
++--- a/include/system/traits.h
+++++ b/include/system/traits.h
++@@ -462,7 +462,7 @@ struct Traits_Tokens: public Transducer_Event, public System_Event, public PMU_E
++     enum {LITTLE, BIG};
++ 
++     // Serial display engines
++-    enum {UART, USB};
+++    enum {UART, USB, SPI};
++ 
++     // Life span multipliers
++     enum {FOREVER = 0, SECOND = 1, MINUTE = 60, HOUR = 3600, DAY = 86400, WEEK = 604800, MONTH = 2592000, YEAR = 31536000};
++diff --git a/makedefs b/makedefs
++index 286b177..32139b5 100644
++--- a/makedefs
+++++ b/makedefs
++@@ -101,7 +101,7 @@ ia32_COMP_PREFIX	:= /usr/bin/x86_64-linux-gnu-
++ armv7_COMP_PREFIX	:= /usr/bin/arm-none-eabi-
++ armv8_COMP_PREFIX	:= /usr/bin/aarch64-linux-gnu-
++ rv32_COMP_PREFIX	:= /usr/local/rv32/bin/riscv32-unknown-linux-gnu-
++-rv64_COMP_PREFIX	:= /usr/bin/riscv64-linux-gnu-
+++rv64_COMP_PREFIX	:= /usr/local/rv64/bin/riscv64-unknown-linux-gnu-
++ COMP_PREFIX		= $($(ARCH)_COMP_PREFIX)
++ 
++ # Architecture specifics
++@@ -196,7 +196,7 @@ ifeq ($(MMOD),sifive_e)
++ riscv_CC_FLAGS		:= -march=rv32gc -mabi=ilp32f -Wl, -mno-relax
++ riscv_AS_FLAGS		:= -march=rv32gc -mabi=ilp32f
++ riscv_LD_FLAGS		:= -m elf32lriscv_ilp32f --no-relax
++-riscv_EMULATOR		= qemu-system-riscv32 $(QEMU_DEBUG) -machine sifive_e -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel 
+++riscv_EMULATOR		= qemu-system-riscv32 $(QEMU_DEBUG) -machine sifive_e -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel
++ riscv_DEBUGGER		:= $(COMP_PREFIX)gdb
++ riscv_FLASHER		:= 
++ riscv_MAGIC		:= --nmagic
++@@ -210,7 +210,7 @@ ifeq ($(ARCH),rv64)
++ riscv_CC_FLAGS		:= -march=rv64gc -mabi=lp64d -Wl, -mno-relax -mcmodel=medany
++ riscv_AS_FLAGS		:= -march=rv64gc -mabi=lp64d
++ riscv_LD_FLAGS		:= -m elf64lriscv_lp64f --no-relax
++-riscv_EMULATOR		= qemu-system-riscv64 $(QEMU_DEBUG) -machine sifive_u -smp 2 -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel 
+++riscv_EMULATOR		= qemu-system-riscv64 $(QEMU_DEBUG) -machine sifive_u -smp 2 -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel $()
++ else
++ riscv_CC_FLAGS      := -march=rv32gc -mabi=ilp32d -Wl, -mno-relax
++ riscv_AS_FLAGS      := -march=rv32gc -mabi=ilp32d
+Index: makedefs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/makedefs b/makedefs
+--- a/makedefs	(revision 286fb4c2ac202120b3b500981bea664f3fffe139)
++++ b/makedefs	(revision c25bf0ffc4e914109f89228a948d80df32ef27c3)
+@@ -101,7 +101,7 @@
+ armv7_COMP_PREFIX	:= /usr/bin/arm-none-eabi-
+ armv8_COMP_PREFIX	:= /usr/bin/aarch64-linux-gnu-
+ rv32_COMP_PREFIX	:= /usr/local/rv32/bin/riscv32-unknown-linux-gnu-
+-rv64_COMP_PREFIX	:= /usr/bin/riscv64-linux-gnu-
++rv64_COMP_PREFIX	:= /usr/local/rv64/bin/riscv64-unknown-linux-gnu-
+ COMP_PREFIX		= $($(ARCH)_COMP_PREFIX)
+ 
+ # Architecture specifics
+@@ -196,7 +196,7 @@
+ riscv_CC_FLAGS		:= -march=rv32gc -mabi=ilp32f -Wl, -mno-relax
+ riscv_AS_FLAGS		:= -march=rv32gc -mabi=ilp32f
+ riscv_LD_FLAGS		:= -m elf32lriscv_ilp32f --no-relax
+-riscv_EMULATOR		= qemu-system-riscv32 $(QEMU_DEBUG) -machine sifive_e -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel 
++riscv_EMULATOR		= qemu-system-riscv32 $(QEMU_DEBUG) -machine sifive_e -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel
+ riscv_DEBUGGER		:= $(COMP_PREFIX)gdb
+ riscv_FLASHER		:= 
+ riscv_MAGIC		:= --nmagic
+@@ -210,7 +210,7 @@
+ riscv_CC_FLAGS		:= -march=rv64gc -mabi=lp64d -Wl, -mno-relax -mcmodel=medany
+ riscv_AS_FLAGS		:= -march=rv64gc -mabi=lp64d
+ riscv_LD_FLAGS		:= -m elf64lriscv_lp64f --no-relax
+-riscv_EMULATOR		= qemu-system-riscv64 $(QEMU_DEBUG) -machine sifive_u -smp 2 -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel 
++riscv_EMULATOR		= qemu-system-riscv64 $(QEMU_DEBUG) -machine sifive_u -smp 2 -m $(MEM_SIZE)k -serial mon:stdio -bios none -nographic -no-reboot $(BOOT_ROM) -kernel $()
+ else
+ riscv_CC_FLAGS      := -march=rv32gc -mabi=ilp32d -Wl, -mno-relax
+ riscv_AS_FLAGS      := -march=rv32gc -mabi=ilp32d
