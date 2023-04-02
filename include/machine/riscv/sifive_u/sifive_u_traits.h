@@ -90,12 +90,12 @@ template <> struct Traits<SPI>: public Traits<Machine_Common>
 {
     static const unsigned int UNITS = 3;
 
-    static const unsigned int CLOCK = Traits<Machine>::TLCLK;
+    static const unsigned int CLOCK = Traits<Machine>::TLCLK; // clock-rate/2 (1GHz / 2 = 500MHz) -> sifive_u manual
 
     static const unsigned int DEF_UNIT = 0;
-    static const unsigned int DEF_PROTOCOL = 0;
-    static const unsigned int DEF_MODE = 0;
-    static const unsigned int DEF_DATA_BITS = 8;
+    static const unsigned int DEF_PROTOCOL = 0x2;   // QUAD mode
+    static const unsigned int DEF_MODE = 0;         // non flash
+    static const unsigned int DEF_DATA_BITS = 8;    // 8 bits per time
     static const unsigned int DEF_BIT_RATE = 250000;
 };
 
