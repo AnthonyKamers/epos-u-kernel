@@ -35,10 +35,10 @@ public:
             System::_heap = new (&System::_preheap[sizeof(Segment)]) Heap(heap, System::_heap_segment->size());
         } else
             System::_heap = new (&System::_preheap[0]) Heap(MMU::alloc(MMU::pages(HEAP_SIZE)), HEAP_SIZE);
-        
-        if(Traits<System>::shared_heap) {
-            Shared_Memory::_shared_segment = new (&Shared_Memory::_preheap[0]) Segment(HEAP_SIZE, Segment::Flags::SHR);
-        } 
+
+        // it always initializes the shared heap (to get share memory between different processes)
+        Shared_Heap::_shared_segment = new (&Shared_Heap::_preheap[0]) Segment(HEAP_SIZE, Segment::Flags::SYS);
+
         db<Init>(INF) << "Initializing the machine: " << endl;
         Machine::init();
 

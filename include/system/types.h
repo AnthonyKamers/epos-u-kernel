@@ -8,8 +8,7 @@ typedef __SIZE_TYPE__ size_t;
 __BEGIN_API
 
 // Memory allocators
-enum System_Allocator { SYSTEM };
-enum Shared_Allocator { SHARED };
+enum System_Allocator { SYSTEM, SHARED };
 enum Scratchpad_Allocator { SCRATCHPAD };
 enum Color {
     COLOR_0,  COLOR_1,  COLOR_2,  COLOR_3,  COLOR_4,  COLOR_5,  COLOR_6,  COLOR_7,
@@ -40,9 +39,6 @@ extern "C"
 }
 inline void * operator new(size_t s, void * a) { return a; }
 inline void * operator new[](size_t s, void * a) { return a; }
-
-void * operator new(size_t, const EPOS::Shared_Allocator &);
-void * operator new[](size_t, const EPOS::Shared_Allocator &);
 
 void * operator new(size_t, const EPOS::System_Allocator &);
 void * operator new[](size_t, const EPOS::System_Allocator &);

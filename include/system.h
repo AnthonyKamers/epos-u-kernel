@@ -24,12 +24,12 @@ private:
     static Heap * _heap;
 };
 
-class Shared_Memory {
+class Shared_Heap {
     friend class Init_System; // Init_System iniciará a heap e segmento
     friend void * ::malloc(size_t);
     friend void ::free(void*);
-    friend void * ::operator new(size_t, const EPOS::Shared_Allocator&);
-    friend void * ::operator new[](size_t, const EPOS::Shared_Allocator&);
+    friend void * ::operator new(size_t, const EPOS::System_Allocator &);
+    friend void * ::operator new[](size_t, const EPOS::System_Allocator &);
     friend void ::operator delete(void*);
     friend void ::operator delete[](void*);
 
@@ -101,21 +101,19 @@ inline void * operator new[](size_t bytes) {
 }
 
 inline void * operator new(size_t bytes, const EPOS::System_Allocator & allocator) {
-    return _SYS::System::_heap->alloc(bytes);
+    __USING_SYS
+    if (allocator == EPOS::SYSTEM)
+        return System::_heap->alloc(bytes);
+    else // EPOS::SHARED
+        return (void *) Address_Space(MMU::current()).attach(Shared_Heap::_shared_segment);
 }
 
 inline void * operator new[](size_t bytes, const EPOS::System_Allocator & allocator) {
-    return _SYS::System::_heap->alloc(bytes);
-}
-
-inline void * operator new(size_t bytes, const EPOS::Shared_Allocator & allocator) {
-    __USING_SYS;
-    return Address_Space(MMU::current()).attach(Shared_Memory::_shared_segment);
-}
-
-inline void * operator new[](size_t bytes, const EPOS::Shared_Allocator & allocator) {
-    __USING_SYS;
-    return Address_Space(MMU::current()).attach(Shared_Memory::_shared_segment);
+    __USING_SYS
+    if (allocator == EPOS::SYSTEM)
+        return System::_heap->alloc(bytes);
+    else // EPOS::SHARED
+        return (void *) Address_Space(MMU::current()).attach(Shared_Heap::_shared_segment);
 }
 
 // Delete cannot be declared inline due to virtual destructors
