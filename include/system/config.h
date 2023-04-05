@@ -117,7 +117,7 @@ namespace EPOS {
 
 #define __EEPROM_H              __HEADER_MACH(eeprom)
 #define __UART_H                __HEADER_MACH(uart)
-#define __SPI_H                 __HEADER_MACH(spi)
+//#define __SPI_H                 __HEADER_MACH(spi)
 #define __RS485_H               __HEADER_MACH(rs485)
 #define __USB_H                 __HEADER_MACH(usb)
 #define __I2C_H                 __HEADER_MACH(i2c)
@@ -182,7 +182,7 @@ namespace EPOS {
 #define __PMU_H                 __HEADER_ARCH(pmu)
 
 #define __UART_H                __HEADER_MACH(uart)
-#define __SPI_H                 __HEADER_MACH(spi)
+//#define __SPI_H                 __HEADER_MACH(spi)
 #endif
 
 #include <system/meta.h>

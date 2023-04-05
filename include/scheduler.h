@@ -145,6 +145,19 @@ public:
     FCFS(int p = NORMAL, Tn & ... an);
 };
 
+// Deadline Monotonic
+class DM: public Priority
+{
+public:
+    static const bool timed = false;
+    static const bool dynamic = false;
+    static const bool preemptive = true;
+
+public:
+    template <typename ... Tn>
+    DM(int p = NORMAL, Tn & ... an);
+};
+
 __END_SYS
 
 #endif
