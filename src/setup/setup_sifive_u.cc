@@ -34,11 +34,33 @@ private:
     static const unsigned long FREE_TOP         = Memory_Map::FREE_TOP;
     static const unsigned long SETUP            = Memory_Map::SETUP;
     static const unsigned long BOOT_STACK       = Memory_Map::BOOT_STACK;
+    static const unsigned long PAGE_TABLES      = Memory_Map::PAGE_TABLES;
+    static const unsigned int  PAGE_SIZE        = 4096;
+
+    // Logical memory map
+    static const unsigned int APP_LOW = Memory_Map::APP_LOW;
+    static const unsigned int PHY_MEM = Memory_Map::PHY_MEM;
+    static const unsigned int IO = Memory_Map::IO;
+    static const unsigned int SYS = Memory_Map::SYS;
+    static const unsigned int SYS_INFO = Memory_Map::SYS_INFO;
+    static const unsigned int SYS_PT = Memory_Map::SYS_PT;
+    static const unsigned int SYS_PD = Memory_Map::SYS_PD;
+    static const unsigned int SYS_CODE = Memory_Map::SYS_CODE;
+    static const unsigned int SYS_DATA = Memory_Map::SYS_DATA;
+    static const unsigned int SYS_STACK = Memory_Map::SYS_STACK;
+    static const unsigned int APP_CODE = Memory_Map::APP_CODE;
+    static const unsigned int APP_DATA = Memory_Map::APP_DATA;
+    static const unsigned long SYS_HIGH = Memory_Map::SYS_HIGH;
+    static const unsigned long APP_HIGH = Memory_Map::APP_HIGH;
+    static const unsigned long IMAGE = Memory_Map::IMAGE;
 
     // Architecture Imports
     typedef CPU::Reg Reg;
     typedef CPU::Phy_Addr Phy_Addr;
     typedef CPU::Log_Addr Log_Addr;
+    typedef MMU::RV64_Flags Flags;
+    typedef MMU::Page_Table Page_Table;
+    typedef MMU::Page_Directory Page_Directory;
 
 public:
     Setup();
@@ -46,7 +68,7 @@ public:
 private:
     void say_hi();
     void call_next();
-
+    void init_mmu();
 private:
     System_Info * si;
 };
@@ -67,6 +89,9 @@ Setup::Setup()
 
     // Print basic facts about this EPOS instance
     say_hi();
+  
+    // Build page tables
+    init_mmu();
 
     // SETUP ends here, so let's transfer control to the next stage (INIT or APP)
     call_next();
@@ -104,7 +129,32 @@ void Setup::say_hi()
 
     kout << endl;
 }
+void Setup::init_mmu()
+{
+    unsigned int PT_ENTRIES = MMU::PT_ENTRIES;
+    unsigned long pages = MMU::pages(RAM_TOP + 1);
+    unsigned total_pts = MMU::page_tables(pages);  
+    kout << "Total Pages: " << total_pts << endl;
+    
+    unsigned int PD_ENTRIES_LVL_2 = total_pts / PT_ENTRIES;
+    unsigned int PD_ENTRIES_LVL_1 = PT_ENTRIES;
+    unsigned int PT_ENTRIES_LVL_0 = PT_ENTRIES;
 
+ 
+    kout << "LVL 2: " << PD_ENTRIES_LVL_2 << endl;
+    kout << "LVL 1: " << PD_ENTRIES_LVL_1 << endl;
+    kout << "LVL 0: " << PT_ENTRIES_LVL_0 << endl;
+  
+    Phy_Addr PD2_ADDR = PAGE_TABLES;
+    Phy_Addr pts = PAGE_TABLES;
+    kout << "Page Tables: " << pts << endl;
+
+    Page_Directory *master = new ((void *)PD2_ADDR) Page_Directory();
+    
+    kout << "Allocated L2: " << pts << endl;
+    asm("setup:");
+
+};
 
 void Setup::call_next()
 {

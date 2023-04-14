@@ -47,6 +47,8 @@ class Machine;
 class PCI;
 class IC;
 class Timer;
+class OTP;
+class IO;
 class RTC;
 class UART;
 class SPI;
@@ -488,3 +490,4 @@ struct Traits {
 __END_SYS
 
 #endif
+

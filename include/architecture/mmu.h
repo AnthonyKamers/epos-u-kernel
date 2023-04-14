@@ -9,11 +9,7 @@
 
 __BEGIN_SYS
 
-// This common package provides operations to implement MMUs assuming a design with the following elements:
-// * A Page_Directory (PD), which is the higher level of the paging hierarchy, associated to an Address_Space via a Directory;
-// * A viable size Page_Table (PT), which is the lower level of the paging hierarchy, associated with a Segment via a Chunk;
-// * An eventual Attacher (AT), which comprises all the intermediate levels of the paging hierarchy (non existent for two-level paging, second level for three-level paging, second and third levels for four-level paging).
-template<unsigned int PD_BITS, unsigned int PT_BITS, unsigned int OFFSET_BITS, unsigned int AT_BITS = 0>
+template<unsigned int DIRECTORY_BITS_LVL_2, int DIRECTORY_BITS_LVL_1, unsigned int PAGE_BITS, unsigned int OFFSET_BITS>
 class MMU_Common
 {
 protected:
@@ -24,31 +20,21 @@ protected:
     typedef CPU::Log_Addr Log_Addr;
     typedef CPU::Phy_Addr Phy_Addr;
 
-    // Address Constants
-    static const unsigned long LA_BITS  = OFFSET_BITS + PT_BITS + AT_BITS + PD_BITS;
-    static const unsigned long PT_SHIFT = OFFSET_BITS;
-    static const unsigned long AT_SHIFT = OFFSET_BITS + PT_BITS;
-    static const unsigned long PD_SHIFT = OFFSET_BITS + PT_BITS + AT_BITS;
+    // Page constants
+    static const unsigned long PAGE_SHIFT = OFFSET_BITS;
+    static const unsigned long PAGE_SIZE = 1 << PAGE_SHIFT;
+    static const unsigned long DIRECTORY_SHIFT_LVL_1 = OFFSET_BITS + PAGE_BITS;
+    static const unsigned long DIRECTORY_SHIFT_LVL_2 = OFFSET_BITS + PAGE_BITS + DIRECTORY_BITS_LVL_1;
 
-    static const unsigned long PG_SIZE = 1UL << OFFSET_BITS;
-    static const unsigned long PT_SPAN = 1UL << (OFFSET_BITS + PT_BITS);
-    static const unsigned long AT_SPAN = 1UL << (OFFSET_BITS + PT_BITS + AT_BITS);
-    static const unsigned long PD_SPAN = 1UL << (OFFSET_BITS + PT_BITS + AT_BITS + PD_BITS);
 
 public:
     // Memory page
-    typedef unsigned char Page[PG_SIZE];
+    typedef unsigned char Page[PAGE_SIZE];
     typedef Page Frame;
 
-    // Page_Table, Attacher and Page_Directory entries
+    // Page_Table and Page_Directory entries
     typedef Phy_Addr PT_Entry;
-    typedef Phy_Addr AT_Entry;
     typedef Phy_Addr PD_Entry;
-
-    // Number of entries in Page_Table, Attacher and Page_Directory
-    static const unsigned int PT_ENTRIES = 1 << PT_BITS;
-    static const unsigned int AT_ENTRIES = 1 << AT_BITS;
-    static const unsigned int PD_ENTRIES = 1 << PD_BITS;
 
     // Page Flags
     class Flags
@@ -83,31 +69,33 @@ public:
         unsigned int _flags;
     };
 
-    // Page types
-    enum Page_Type {PG, PT, AT, PD};
+    // Number of entries in Page_Table and Page_Directory
+    static const unsigned int PT_ENTRIES = 1 << PAGE_BITS;
+    static const unsigned int PD_ENTRIES_LVL_1 = 1 << DIRECTORY_BITS_LVL_1;
+    static const unsigned int PD_ENTRIES_LVL_2 = 1 << DIRECTORY_BITS_LVL_2;
 
 public:
-    // Functions to calculate quantities
-    constexpr static unsigned int pds(unsigned int ats) { return 1; }
-    constexpr static unsigned int ats(unsigned int pts) { return AT_BITS ? (pts + AT_ENTRIES - 1) / AT_ENTRIES : 0; }
-    constexpr static unsigned int pts(unsigned int pages) { return PT_BITS ? (pages + PT_ENTRIES - 1) / PT_ENTRIES : 0; }
-    constexpr static unsigned long pages(unsigned long bytes) { return (bytes + sizeof(Page) - 1) / sizeof(Page); }
+    constexpr static unsigned long pages(unsigned long bytes) {return (bytes + sizeof(Page) - 1) / sizeof(Page); }
+    constexpr static unsigned long page_tables(unsigned long pages) { return sizeof(Page) > sizeof(long) ? (pages + PT_ENTRIES - 1) / PT_ENTRIES : 0; }
 
-    // Functions to handle logical addresses
-    constexpr static unsigned long ind(Log_Addr addr) { return addr & ~(sizeof(Page) - 1); }
-    constexpr static unsigned long off(Log_Addr addr) { return addr & (sizeof(Page) - 1); }
-    constexpr static unsigned long pti(Log_Addr addr) { return (addr >> PT_SHIFT) & (PT_ENTRIES - 1); }
-    constexpr static unsigned long pti(Log_Addr base, Log_Addr addr) { return pti(addr - base); }
-    constexpr static unsigned long ati(Log_Addr addr) { return (addr >> AT_SHIFT) & (AT_ENTRIES - 1); }
-    constexpr static unsigned long pdi(Log_Addr addr) { return (addr >> PD_SHIFT) & (PD_ENTRIES - 1); }
+    constexpr static unsigned long offset(const Log_Addr & addr) { return addr & (sizeof(Page) - 1); }
+    constexpr static unsigned long indexes(const Log_Addr & addr) { return addr & ~(sizeof(Page) - 1); }
 
-    constexpr static Log_Addr align_page(Log_Addr addr) { return (addr + sizeof(Page) - 1) & ~(sizeof(Page) - 1); }
-    constexpr static Log_Addr align_segment(Log_Addr addr) { return (addr + PT_ENTRIES * sizeof(Page) - 1) &  ~(PT_ENTRIES * sizeof(Page) - 1); }
+    constexpr static unsigned long page(const Log_Addr & addr) { return (addr >> PAGE_SHIFT) & (PT_ENTRIES - 1); }
+    constexpr static unsigned long directory_lvl_1(const Log_Addr & addr) { return (addr >> DIRECTORY_SHIFT_LVL_1) & 0x1ff; }
+    constexpr static unsigned long directory_lvl_2(const Log_Addr & addr) { return (addr >> DIRECTORY_SHIFT_LVL_2) & 0x1ff; }
 
-    constexpr static Log_Addr directory_bits(Log_Addr addr) { return (addr & ~((1 << PD_BITS) - 1)); }
+    constexpr static unsigned long index(const Log_Addr & base, const Log_Addr & addr) { return (addr - base) >> PAGE_SHIFT; }
+
+    constexpr static Log_Addr align_page(const Log_Addr & addr) { return (addr + sizeof(Page) - 1) & ~(sizeof(Page) - 1); }
+    constexpr static Log_Addr align_directory(const Log_Addr & addr) { return (addr + PT_ENTRIES * sizeof(Page) - 1) &  ~(PT_ENTRIES * sizeof(Page) - 1); }
+
+    constexpr static Log_Addr directory_bits_lvl1(const Log_Addr & addr) { return (addr & ~((1 << DIRECTORY_BITS_LVL_1) - 1)); }
+    constexpr static Log_Addr directory_bits_lvl2(const Log_Addr & addr) { return (addr & ~((1 << DIRECTORY_BITS_LVL_2) - 1)); }
+
 };
 
-class No_MMU: public MMU_Common<0, 0, 0>
+class No_MMU: public MMU_Common<0, 0, 0, 0>
 {
     friend class CPU;
     friend class Setup;
@@ -161,7 +149,7 @@ public:
         Directory() {}
         Directory(Page_Directory * pd) {}
 
-        Page_Table * pd() const { return 0; }
+        Page_Table * pd() const {return 0;}
 
         void activate() {}
 
@@ -268,6 +256,7 @@ private:
     static List _free;
 };
 
+
 __END_SYS
 
 #endif
@@ -275,3 +264,4 @@ __END_SYS
 #if defined(__MMU_H) && !defined(__mmu_common_only__)
 #include __MMU_H
 #endif
+
