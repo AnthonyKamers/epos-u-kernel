@@ -158,6 +158,7 @@ public:
         unsigned int pts() const { return _pts; }
         Page_Table *pt() const { return _pt; }
         unsigned int size() const { return _bytes; }
+	Phy_Addr phy_address() const { return _phy_addr; } // always CT
         RV64_Flags flags() const {return _flags;}
         int resize(unsigned int amount) { return 0; }
 
@@ -168,6 +169,7 @@ public:
         unsigned int _bytes;
         RV64_Flags _flags;
         Page_Table *_pt;
+	Phy_Addr _phy_addr;
     };
 
     // Page Directory

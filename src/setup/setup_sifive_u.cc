@@ -39,15 +39,15 @@ private:
 
     // Logical memory map
     static const unsigned int APP_LOW = Memory_Map::APP_LOW;
-    static const unsigned int PHY_MEM = Memory_Map::PHY_MEM;
+//    static const unsigned int PHY_MEM = Memory_Map::PHY_MEM;
     static const unsigned int IO = Memory_Map::IO;
-    static const unsigned int SYS = Memory_Map::SYS;
-    static const unsigned int SYS_INFO = Memory_Map::SYS_INFO;
-    static const unsigned int SYS_PT = Memory_Map::SYS_PT;
-    static const unsigned int SYS_PD = Memory_Map::SYS_PD;
-    static const unsigned int SYS_CODE = Memory_Map::SYS_CODE;
-    static const unsigned int SYS_DATA = Memory_Map::SYS_DATA;
-    static const unsigned int SYS_STACK = Memory_Map::SYS_STACK;
+//    static const unsigned int SYS = Memory_Map::SYS;
+//    static const unsigned int SYS_INFO = Memory_Map::SYS_INFO;
+//    static const unsigned int SYS_PT = Memory_Map::SYS_PT;
+//    static const unsigned int SYS_PD = Memory_Map::SYS_PD;
+//    static const unsigned int SYS_CODE = Memory_Map::SYS_CODE;
+//    static const unsigned int SYS_DATA = Memory_Map::SYS_DATA;
+//    static const unsigned int SYS_STACK = Memory_Map::SYS_STACK;
     static const unsigned int APP_CODE = Memory_Map::APP_CODE;
     static const unsigned int APP_DATA = Memory_Map::APP_DATA;
     static const unsigned long SYS_HIGH = Memory_Map::SYS_HIGH;
@@ -109,7 +109,7 @@ void Setup::say_hi()
     kout << "This is EPOS!\n" << endl;
     kout << "Setting up this machine as follows: " << endl;
     kout << "  Mode:         " << ((Traits<Build>::MODE == Traits<Build>::LIBRARY) ? "library" : (Traits<Build>::MODE == Traits<Build>::BUILTIN) ? "built-in" : "kernel") << endl;
-    kout << "  Processor:    " << Traits<Machine>::CPUS << " x RV" << Traits<CPU>::WORD_SIZE << " at " << Traits<CPU>::CLOCK / 1000000 << " MHz (BUS clock = " << Traits<Machine>::HFCLK / 1000000 << " MHz)" << endl;
+    //kout << "  Processor:    " << Traits<Machine>::CPUS << " x RV" << Traits<CPU>::WORD_SIZE << " at " << Traits<CPU>::CLOCK / 1000000 << " MHz (BUS clock = " << Traits<Machine>::HFCLK / 1000000 << " MHz)" << endl;
     kout << "  Machine:      SiFive-U" << endl;
     kout << "  Memory:       " << (RAM_TOP + 1 - RAM_BASE) / 1024 << " KB [" << reinterpret_cast<void *>(RAM_BASE) << ":" << reinterpret_cast<void *>(RAM_TOP) << "]" << endl;
     kout << "  User memory:  " << (FREE_TOP - FREE_BASE) / 1024 << " KB [" << reinterpret_cast<void *>(FREE_BASE) << ":" << reinterpret_cast<void *>(FREE_TOP) << "]" << endl;
@@ -150,7 +150,7 @@ void Setup::init_mmu()
     kout << "Page Tables: " << pts << endl;
 
     Page_Directory *master = new ((void *)PD2_ADDR) Page_Directory();
-    
+    kout << master;
     kout << "Allocated L2: " << pts << endl;
     asm("setup:");
 
