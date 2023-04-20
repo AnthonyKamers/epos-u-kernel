@@ -7,7 +7,7 @@ void MMU::init()
 {
     typedef MMU::Phy_Addr Phy_Addr;
 
-    db<Init, MMU>(INF) << "MMU::init()" << endl;
+    db<Init, MMU>(INF) << "MMU::init()::TestSv39" << endl;
     System_Info * si = System::info();
     static const unsigned int HEAP_SIZE = Traits<System>::HEAP_SIZE;
     db<Init, MMU>(INF) << "heap size = " << HEAP_SIZE << endl;

@@ -91,7 +91,7 @@ Setup::Setup()
     say_hi();
   
     // Build page tables
-    init_mmu();
+//    init_mmu();
 
     // SETUP ends here, so let's transfer control to the next stage (INIT or APP)
     call_next();
@@ -129,22 +129,24 @@ void Setup::say_hi()
 
     kout << endl;
 }
+
+// TODO ALL
 void Setup::init_mmu()
 {
     unsigned int PT_ENTRIES = MMU::PT_ENTRIES;
     unsigned long pages = MMU::pages(RAM_TOP + 1);
-    unsigned total_pts = MMU::page_tables(pages);  
+    unsigned total_pts = MMU::pts(pages);
     kout << "Total Pages: " << total_pts << endl;
-    
+
     unsigned int PD_ENTRIES_LVL_2 = total_pts / PT_ENTRIES;
     unsigned int PD_ENTRIES_LVL_1 = PT_ENTRIES;
     unsigned int PT_ENTRIES_LVL_0 = PT_ENTRIES;
 
- 
+
     kout << "LVL 2: " << PD_ENTRIES_LVL_2 << endl;
     kout << "LVL 1: " << PD_ENTRIES_LVL_1 << endl;
     kout << "LVL 0: " << PT_ENTRIES_LVL_0 << endl;
-  
+
     Phy_Addr PD2_ADDR = PAGE_TABLES;
     Phy_Addr pts = PAGE_TABLES;
     kout << "Page Tables: " << pts << endl;
