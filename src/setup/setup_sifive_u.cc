@@ -46,6 +46,7 @@ public:
 private:
     void say_hi();
     void call_next();
+    void mmu_init();
 
 private:
     System_Info * si;
@@ -115,6 +116,20 @@ void Setup::call_next()
 
     // SETUP is now part of the free memory and this point should never be reached, but, just in case ... :-)
     db<Setup>(ERR) << "OS failed to init!" << endl;
+}
+
+void Setup::mmu_init() {
+    unsigned int pt_entries = MMU::PT_ENTRIES;
+    unsigned long pages = MMU::pages(RAM_TOP + 1);
+    unsigned int page_tables = MMU::pts(pages);
+    unsigned int attachers = MMU::ats(page_tables);
+    unsigned int page_directories = MMU::pds(attachers);
+
+    kout << "Page table entries: " << pt_entries << endl;
+    kout << "pages: " << pages << endl;
+    kout << "page tables: " << page_tables << endl;
+    kout << "attachers: " << attachers << endl;
+    kout << "page directories: " << page_directories << endl;
 }
 
 __END_SYS

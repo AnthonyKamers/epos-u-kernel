@@ -105,6 +105,9 @@ public:
     constexpr static Log_Addr align_segment(Log_Addr addr) { return (addr + PT_ENTRIES * sizeof(Page) - 1) &  ~(PT_ENTRIES * sizeof(Page) - 1); }
 
     constexpr static Log_Addr directory_bits(Log_Addr addr) { return (addr & ~((1 << PD_BITS) - 1)); }
+
+    // Utils functions
+    static bool is_leaf(PT_Entry entry) {return ((entry & 0xe) != 0);}
 };
 
 class No_MMU: public MMU_Common<0, 0, 0>
