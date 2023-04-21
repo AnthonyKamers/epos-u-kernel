@@ -39,6 +39,9 @@ private:
     typedef CPU::Reg Reg;
     typedef CPU::Phy_Addr Phy_Addr;
     typedef CPU::Log_Addr Log_Addr;
+    typedef MMU::Page Page;
+    typedef MMU::Page_Table Page_Table;
+    typedef MMU::Page_Directory Page_Directory;
 
 public:
     Setup();
@@ -68,6 +71,9 @@ Setup::Setup()
 
     // Print basic facts about this EPOS instance
     say_hi();
+
+    // Initialize MMU page tables
+    mmu_init();
 
     // SETUP ends here, so let's transfer control to the next stage (INIT or APP)
     call_next();
@@ -129,7 +135,20 @@ void Setup::mmu_init() {
     kout << "pages: " << pages << endl;
     kout << "page tables: " << page_tables << endl;
     kout << "attachers: " << attachers << endl;
-    kout << "page directories: " << page_directories << endl;
+    kout << "page directories: " << page_directories << endl << endl;
+
+    // Make Page Directory (L2) -> Allocate sufficient space for it
+    auto * l2_level = new ((void *) (si->pmm.free1_base)) Page_Directory();
+    l2_level->map(si->pmm.free1_base, si->pmm.free1_top, MMU::RV64_Flags::CONTIGUOUS);
+    MMU::set_L2(l2_level);
+
+    auto * l1_level = new ((void *) (si->pmm.free2_base)) Page_Table();
+    l1_level->map(si->pmm.free2_base, si->pmm.free2_top, MMU::RV64_Flags::CONTIGUOUS);
+    MMU::set_L1(l1_level);
+
+    auto * l0_level = new ((void *) (si->pmm.free3_base)) Page_Table();
+    l0_level->map(si->pmm.free3_base, si->pmm.free3_top, MMU::RV64_Flags::CONTIGUOUS);
+    MMU::set_L0(l0_level);
 }
 
 __END_SYS
@@ -138,7 +157,8 @@ using namespace EPOS::S;
 
 void _entry() // machine mode
 {
-    if(CPU::mhartid() != 0)                             // SiFive-U always has 2 cores, so we disable CU1 here
+    // SiFive-U always has 2 cores, so we disable core 0 here (only core 1 has MMU implemented)
+    if(CPU::mhartid() != 0)
         CPU::halt();
 
     CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)

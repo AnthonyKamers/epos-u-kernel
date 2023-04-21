@@ -36,6 +36,7 @@ protected:
     static const unsigned long PD_SPAN = 1UL << (OFFSET_BITS + PT_BITS + AT_BITS + PD_BITS);
 
 public:
+
     // Memory page
     typedef unsigned char Page[PG_SIZE];
     typedef Page Frame;
