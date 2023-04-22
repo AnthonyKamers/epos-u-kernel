@@ -12,7 +12,7 @@
 __BEGIN_SYS
 
 // PPN[2] = 9 bits, PPN[1] = 9 bits, Offset - 12 bits PPN[0] = 9 bits
-class MMU: public MMU_Common<9, 9, 12, 9> {
+class MMU: public MMU_Common<9, 9, 9, 12> {
     friend class CPU;
     friend class Setup;
 
@@ -130,24 +130,59 @@ public:
 public:
     MMU() {}
 
-    static Phy_Addr alloc(unsigned int bytes) { return 0; }
+    static Phy_Addr alloc(unsigned int bytes)  {
+        unsigned int frames = bytes / PG_SIZE;
+        Phy_Addr phy(false);
+        unsigned long size = 0;
+        if (frames)
+        {
+            List::Element *e = _free.search_decrementing(frames);
+            if (e)
+            {
+                db<MMU>(INF) << "Object: " << e->object() << endl;
+                size = e->size();
+                phy = e->object() + e->size(); // PAGE_SIZE
+            }
+            else
+            {
+                db<MMU>(ERR) << "MMU::alloc() failed!" << endl;
+            }
+            db<MMU>(INF) << "MMU::alloc(frames=" << frames << ") => " << phy << endl;
+            db<MMU>(INF) << "MMU::List Element: " << sizeof(List::Element) << endl;
+        }
+
+        db<MMU>(INF) << "Size: " << size << endl;
+
+        return phy;
+    };
+
     static Phy_Addr calloc(unsigned int bytes) { return 0; }
     static void free(Phy_Addr addr, unsigned int bytes) {}
-    static unsigned int allocable() { return 0; }
-    static Page_Directory * volatile current() { return 0; }
-    static Phy_Addr physical(Log_Addr addr) { return 0; }
+    static unsigned int allocable() { return _free.head() ? _free.head()->size() : 0; }
+
+    static void master(Page_Directory * pd) {_master = pd;}
+
+    static Page_Directory *volatile current() { return static_cast<Page_Directory *volatile>(phy2log(CPU::pdp())); }
 
     static void flush_tlb() { CPU::flush_tlb(); }
     static void flush_tlb(Log_Addr addr) { CPU::flush_tlb(addr); }
 
 private:
     static void init();
-    static Log_Addr phy2log(Phy_Addr physical) { return 0; }
-    static PD_Entry phy2pde(Phy_Addr bytes) { return 0; }
-    static Phy_Addr pde2phy(PD_Entry entry) { return 0; }
-    static PT_Entry phy2pte(Phy_Addr bytes, RV64_Flags) { return 0; }
-    static Phy_Addr pte2phy(PT_Entry entry) { return 0; }
-    static RV64_Flags pte2flg(PT_Entry entry) { return 0; }
+    static Log_Addr phy2log(const Phy_Addr &phy) { return phy; }
+
+    static PD_Entry phy2pde(Phy_Addr bytes) { return ((bytes >> 12) << 10) | RV64_Flags::VALID; }
+
+    static Phy_Addr pde2phy(PD_Entry entry) { return (entry & ~RV64_Flags::MASK) << 2; }
+
+    static PT_Entry phy2pte(Phy_Addr bytes, RV64_Flags flags) { return ((bytes >> 12) << 10) | flags; }
+
+    static Phy_Addr pte2phy(PT_Entry entry) { return (entry & ~RV64_Flags::MASK) << 2; }
+
+    static RV64_Flags pde2flg(PT_Entry entry) { return (entry & RV64_Flags::MASK); }
+
+    static List _free;
+    static Page_Directory *_master;
 };
 
 __END_SYS
