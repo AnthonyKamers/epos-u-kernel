@@ -5,7 +5,7 @@
 __BEGIN_SYS
 
 // Methods
-Segment::Segment(unsigned int bytes, Flags flags): Chunk(bytes, flags, WHITE)
+Segment::Segment(unsigned int bytes, Flags flags): Chunk(bytes, flags)
 {
     db<Segment>(TRC) << "Segment(bytes=" << bytes << ",flags=" << flags << ") [Chunk::pt=" << Chunk::pt() << ",sz=" << Chunk::size() << "] => " << this << endl;
 }
