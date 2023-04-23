@@ -44,6 +44,7 @@ public:
         PAddr sys_pd;           // System Page Directory
         PAddr sys_pt;           // System Page Table
         PAddr phy_mem_pt;       // Contiguous set of Page tables to map the whole physical memory (pointer to the first)
+        PAddr phy_mem_pts;      // Number of Page tables to map the whole physical memory
         PAddr io_pts;           // Page tables to map the I/O address space
         PAddr app_code_pt;      // First Application code segment's contiguous set of Page Table (pointer to the first)
         PAddr app_data_pt;      // First Application data segment's contiguous set of Page Table (pointer to the first)

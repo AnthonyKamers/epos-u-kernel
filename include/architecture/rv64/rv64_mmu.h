@@ -39,7 +39,7 @@ public:
             MASK = (1 << 10) - 1
         };
 
-        RV64_Flags() {}
+        RV64_Flags() {};
         RV64_Flags(const RV64_Flags &f) : _flags(f) {}
         RV64_Flags(unsigned int f) : _flags(f) {}
         RV64_Flags(const Flags &f) : _flags(((f & Flags::PRE) ? VALID : 0) |
@@ -59,21 +59,35 @@ public:
     private:
         PT_Entry page_tables[PT_ENTRIES];
     public:
-        Page_Table() {}
+        Page_Table() {};
 
         PT_Entry & operator[](unsigned int i) { return page_tables[i]; }
         PT_Entry get_entry(unsigned int i) { return page_tables[i]; }
-        void map(int from, int to, RV64_Flags flags) {}
-        void remap(Phy_Addr addr, RV64_Flags flags, int from = 0, int to = PT_ENTRIES, int size = sizeof(Page)) {}
-        void unmap(int from = 0, int to = PT_ENTRIES) {}
+
+        void map(unsigned int from, unsigned int to, RV64_Flags flags) {
+            Phy_Addr *addr = alloc(to - from);
+            if (addr) remap(addr, flags, from, to);
+            else
+                for(; from < to; from++)
+                    page_tables[from] = phy2pte(alloc(1), flags);
+        }
+
+        void remap(Phy_Addr addr, RV64_Flags flags, unsigned int from = 0, unsigned int to = PT_ENTRIES) {
+            addr = align_page(addr);
+            for (; from < to; from++) {
+                Log_Addr *page_table_entry = phy2log(&page_tables[from]);
+                *page_table_entry = phy2pte(addr, flags);
+                addr += sizeof(Page);
+            }
+        }
 
         // Print Page Table
         friend OStream & operator<<(OStream & os, Page_Table & pt) {
             os << "{\n";
-//            for (int i = 0; i < PT_ENTRIES; i++) {
-//                if (pt[i])
-//                    os << "\n";
-//            }
+            for (unsigned int i = 0; i < MMU::PT_ENTRIES; i++) {
+                if (pt[i])
+                    os << "\n";
+            }
             os << "}";
             return os;
         }
@@ -83,24 +97,45 @@ public:
     class Chunk {
     public:
         // TODO Implement these methods using the new L0, L1, L2 Page Tables
-        Chunk() {}
+        Chunk() {};
         Chunk(unsigned int bytes, Flags flags, Color color = WHITE) {
-            db<MMU>(INF) << "Chamou Chunk(bytes, flags, color)" << endl;
+            db<MMU>(INF) << "Called Chunk(bytes, flags, color)" << endl;
+
+            _from = 0;
+            _to = pages(bytes);
+            _pts = MMU::pts(_to);
+            _bytes = bytes;
+            _flags = RV64_Flags(flags);
+
+            // TODO: Need to have different behaviour for L0 and L1
+            _pt = calloc(_pts);
+            _pt->map(_from, _to, _flags);
         }
+
         Chunk(Phy_Addr phy_addr, unsigned int bytes, Flags flags) {
-            db<MMU>(INF) << "Chamou Chunk(phy_addr, bytes, flags)" << endl;
+            db<MMU>(INF) << "Called Chunk(phy_addr, bytes, flags)" << endl;
+            _from = 0;
+            _to = pages(bytes);
+            _pts = MMU::pts(_to);
+            _bytes = bytes;
+            _flags = RV64_Flags(flags);
+
+            // TODO: Need to have different behaviour for L0 and L1
+            _pt = calloc(_pts);
+            _pt->remap(phy_addr, _flags, _from, _to);
         }
-        Chunk(Phy_Addr pt, unsigned int from, unsigned int to, Flags flags) {
-            db<MMU>(INF) << "Chamou Chunk(pt, from , to, flags)" << endl;
+
+        ~Chunk() {
+            for (; _from < _to; _from++) free((*static_cast<Page_Table *>(phy2log(_pt)))[_from]);
+            free(_pt, _pts); // the root page table is not destructed in the previous loop
         }
-        ~Chunk() {}
 
         unsigned int pts() const { return _pts; }
         Page_Table *pt() const { return _pt; }
         unsigned int size() const { return _bytes; }
         RV64_Flags flags() const {return _flags;}
-        Phy_Addr phy_address() const { return _phy_addr; } // always CT
-        int resize(unsigned int amount) { return 0; }
+        Phy_Addr phy_address() const { return _phy_addr; } // always CONTIGUOUS
+        int resize(unsigned int amount) { return 0; }  // if it is CONTIGUOUS, not necessary to resize
     private:
         unsigned int _from;
         unsigned int _to;
@@ -137,8 +172,23 @@ public:
         }
 
         // TODO implement these methods using the new L0, L1, L2 Page Tables
-        Log_Addr attach(const Chunk & chunk) { return 0; }
-        Log_Addr attach(const Chunk & chunk, Log_Addr addr) { return 0; }
+        Log_Addr attach(const Chunk & chunk) {
+            db<MMU>(INF) << "Called Directory:attach(chunk)" << endl;
+            return attach(chunk, APP_LOW);
+        }
+
+        Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
+            db<MMU>(INF) << "Called Directory:attach(chunk, addr)" << endl;
+
+            unsigned int from = directory_bits(addr);
+            for (; from < MMU::PD_ENTRIES; from++)
+                for (unsigned int i = 0; i < MMU::PT_ENTRIES; i++)
+                    return i << PD_SHIFT; // TODO necessary IF to check in which page table will make it
+
+            // if arrived here, cannot attach to anything
+            return false;
+        }
+
         void detach(const Chunk & chunk) {}
         void detach(const Chunk & chunk, Log_Addr addr) {}
 
@@ -153,7 +203,7 @@ public:
     MMU() { }
 
     static Phy_Addr alloc(unsigned int bytes) {
-        db<MMU>(INF) << "Chamou MMU:alloc(bytes)" << endl;
+        db<MMU>(INF) << "Called MMU:alloc(bytes)" << endl;
 
         Phy_Addr phy(false);
         if (bytes) {
@@ -176,7 +226,7 @@ public:
     }
 
     static void free(Phy_Addr addr, unsigned int bytes = 1) {
-        db<MMU>(INF) << "Chamou MMU:free(" << addr << ", " << bytes << ")" << endl;
+        db<MMU>(INF) << "Called MMU:free(" << addr << ", " << bytes << ")" << endl;
         addr = ind(addr);
 
         // make sure it is aligned
