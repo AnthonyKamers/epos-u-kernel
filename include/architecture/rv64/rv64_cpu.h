@@ -395,6 +395,9 @@ public:
     static void mideleg(Reg r) { ASM("csrw mideleg, %0" : : "r"(r) : "cc"); }
     static void medeleg(Reg r) { ASM("csrw medeleg, %0" : : "r"(r) : "cc"); }
 
+    static void pmpcfg0(Reg r) { ASM("csrw pmpcfg0, %0" : : "r"(r) : "cc"); }
+    static void pmpaddr0(Reg r) { ASM("csrw pmpaddr0, %0" : : "r"(r) : "cc"); }
+
     // Supervisor mode
     static void sint_enable()  { ASM("csrsi sstatus, %0" : : "i"(SIE) : "cc"); }
     static void sint_disable() { ASM("csrci sstatus, %0" : : "i"(SIE) : "cc"); }

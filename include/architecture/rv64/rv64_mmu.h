@@ -12,7 +12,8 @@
 __BEGIN_SYS
 
 // Page Directory = 9 bits (4kb)
-// Page Table Segment = 21 bits (
+// Page Table Segment = 21 bits (2Mb)
+// Offset = 12 bits (Sv39 RV64)
 class MMU: public MMU_Common<9, 21, 12> {
     friend class CPU;
     friend class Setup;
@@ -23,6 +24,7 @@ private:
     typedef Grouping_List<MegaPage> ListMegaPage;   // 2Mb page list
 
     static const unsigned int RAM_BASE = Memory_Map::RAM_BASE;
+    static const unsigned int RAM_TOP = Memory_Map::RAM_TOP;
     static const unsigned int APP_LOW = Memory_Map::APP_LOW;
     static const unsigned int PHY_MEM = Memory_Map::PHY_MEM;
 
@@ -63,20 +65,19 @@ public:
         Page_Table() {}
 
         PT_Entry & operator[](unsigned int i) { return _page_table[i]; }
-        PT_Entry get_entry(unsigned int i) { return _page_table[i]; }
 
         void map(unsigned long from, unsigned long to, RV64_Flags flags) {
             Phy_Addr * addr = alloc(to - from);
             if (addr) remap(addr, from, to, flags);
             else
-                for(; from < pnn2pte(alloc(1), flags))
+                for(; from < to; from++)
                     _page_table[from] = pnn2pte(alloc(1), flags);
         }
 
         void remap(Phy_Addr addr, unsigned long from, unsigned long to, RV64_Flags flags) {
             addr = align_page(addr);
-            for(; from < pnn2pte(alloc(1), flags)) {
-                _page_table[from] = pnn2pte(alloc(1), flags);
+            for(; from < to; from++) {
+                _page_table[from] = pnn2pte(addr, flags);
                 addr += sizeof(Frame);
             }
         }
@@ -88,25 +89,52 @@ public:
     class Chunk {
     public:
         Chunk() {}
-        Chunk(unsigned int bytes, Flags flags, Color color = WHITE) {}
-        Chunk(Phy_Addr phy_addr, unsigned int bytes, Flags flags) {}
-        Chunk(Phy_Addr pt, unsigned int from, unsigned int to, Flags flags) {}
-        ~Chunk() {}
+
+        Chunk(unsigned int bytes, Flags flags, Color color = WHITE) {
+            // init variables
+            _from = 0;
+            _to = pages(bytes);
+            _pts = MMU::pts(_to - _from);
+            _pt = calloc_segment(_pts);
+            _flags = RV64_Flags(flags);
+
+            // map
+            _pt->map(_from, _to, _flags);
+        }
+
+        Chunk(Phy_Addr phy_addr, unsigned int bytes, Flags flags) {
+            // init variables
+            _from = 0;
+            _to = pages(bytes);
+            _pts = MMU::pts(_to - _from);
+            _pt = calloc_segment(_pts);
+            _flags = RV64_Flags(flags);
+            _phy_addr = phy_addr;
+
+            // map
+            _pt->remap(_phy_addr, _from, _to, _flags);
+        }
+
+        // TODO Check that
+        ~Chunk() {
+            for (; _from < _to; _from++)
+                free_segment((*static_cast<Page_Table *>(phy2log(_pt)))[_from], _bytes);
+        }
 
         unsigned int pts() const { return _pts; }
         Page_Table *pt() const { return _pt; }
         unsigned int size() const { return _bytes; }
         RV64_Flags flags() const {return _flags;}
-        Phy_Addr phy_address() const { return _phy_addr; } // always CT
+        Phy_Addr phy_address() const { return _phy_addr ? _phy_addr : Phy_Addr(ind((*_pt)[_from])); } // always CONTIGUOUS
         int resize(unsigned int amount) { return 0; }
     private:
+        unsigned int _bytes;
         unsigned int _from;
         unsigned int _to;
+        Page_Table *_pt;
         unsigned int _pts;
-        unsigned int _bytes;
         RV64_Flags _flags;
         Phy_Addr _phy_addr;
-        Page_Table *_pt;
     };
 
     // Page Directory (L2)
@@ -115,7 +143,11 @@ public:
     // Directory (for Address Space)
     class Directory {
     public:
-        Directory(): _pd(calloc(1)), _free(true) {}
+        Directory(): _pd(calloc(1)), _free(true) {
+            for (unsigned long i = 0; i < PD_ENTRIES; i++) {
+                (*_pd)[i] = (*_master)[i];
+            }
+        }
 
         Directory(Page_Directory *pd): _pd(pd), _free(false) {}
 
@@ -127,14 +159,11 @@ public:
         void activate() { CPU::satp((1UL << 63) | reinterpret_cast<CPU::Reg64>(_pd) >> PT_SHIFT); }
 
         Log_Addr attach(const Chunk & chunk) {
-            for(unsigned long i = from; i < PD_ENTRIES; i++)
-                if(attach(i, chunk.pt(), chunk.pts(), chunk.flags()))
-                    return i << AT_SHIFT;
-            return Log_Addr(false);
+            return attach(chunk, APP_LOW);
         }
 
         Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
-            unsigned long from = directory(addr);
+            unsigned long from = pdi(addr);
             if(attach(from, chunk.pt(), chunk.pts(), chunk.flags()))
                 return from << AT_SHIFT;
             return Log_Addr(false);
@@ -151,7 +180,7 @@ public:
         }
 
         void detach(const Chunk & chunk, Log_Addr addr) {
-            unsigned long from = directory(addr);
+            unsigned long from = pdi(addr);
             if(ind((*_pd)[from]) != ind(chunk.pt())) {
                 db<MMU>(WRN) << "MMU::detach(chunk, addr): failed to detach" << endl;
                 return;
@@ -163,7 +192,7 @@ public:
 
         // TODO check if auxiliary methods are being used correctly
         Phy_Addr physical(Log_Addr addr) {
-            Page_Table * pt = reinterpret_cast<Page_Table *>((void *)(*_pd)[ati(addr)]);
+            Page_Table * pt = reinterpret_cast<Page_Table *>((void *)(*_pd)[pdi(addr)]);
             return (*pt)[pti(addr)] | off(addr);
         }
 
@@ -190,36 +219,120 @@ public:
 public:
     MMU() {}
 
-    static Phy_Addr alloc(unsigned int bytes) { return 0; }
-    static Phy_Addr calloc(unsigned int bytes) { return 0; }
-    static void free(Phy_Addr addr, unsigned int bytes) {}
-    static unsigned int allocable() { return 0; }
-    static Page_Directory * volatile current() { return 0; }
-    static Phy_Addr physical(Log_Addr addr) { return 0; }
+    // Alloc Page Tables
+    static Phy_Addr alloc(unsigned int frames = 1) {
+        Phy_Addr phy(false);
 
+        if (frames) {
+            ListPage ::Element * element = _free.search_decrementing(frames);
+            if (element) {
+                phy = element->object() + element->size();
+                db<MMU>(INF) << "MMU::alloc(frames): " << frames << ": " << phy << endl;
+            } else {
+                db<MMU>(WRN) << "MMU::alloc(frames): " << frames << " failed" << endl;
+            }
+        }
+        return phy;
+    }
+
+    static Phy_Addr calloc(unsigned int frames = 1) {
+        Phy_Addr physical = alloc(frames);
+        memset(phy2log(physical), 0, sizeof(Frame) * frames);
+        return physical;
+    }
+
+    static void free(Phy_Addr frame, unsigned int qtd_frames = 1) {
+        db<MMU>(INF) << "MMU::free(frame=" << frame << ",qtd_frames=" << qtd_frames << ")" << endl;
+
+        frame = ind(frame);
+
+        if (frame && qtd_frames) {
+            auto * element = new (phy2log(frame)) ListPage::Element(frame, qtd_frames);
+            ListPage::Element * m1, * m2;
+            _free.insert_merging(element, &m1, &m2);
+        } else {
+            db<MMU>(WRN) << "MMU::free(frame=" << frame << ",qtd_frames=" << qtd_frames << "): failed" << endl;
+        }
+    }
+
+    // Alloc Segments
+    static Phy_Addr alloc_segment(unsigned int bytes = 1) {
+        Phy_Addr phy(false);
+
+        if (bytes) {
+            ListMegaPage ::Element * element = _free_mb.search_decrementing(bytes);
+            if (element) {
+                phy = element->object() + element->size();
+                db<MMU>(INF) << "MMU::alloc_segment(bytes): " << bytes << ": " << phy << endl;
+            } else {
+                db<MMU>(WRN) << "MMU::alloc_segment(bytes): " << bytes << " failed" << endl;
+            }
+        }
+        return phy;
+    }
+
+    static Phy_Addr calloc_segment(unsigned int bytes = 1) {
+        Phy_Addr physical = alloc_segment(bytes);
+        memset(phy2log(physical), 0, sizeof(MegaPage) * bytes);
+        return physical;
+    }
+
+    static void free_segment(Phy_Addr segment, unsigned int qtd_bytes) {
+        db<MMU>(INF) << "MMU::free_segment(segment=" << segment << ",qtd_bytes=" << qtd_bytes << ")" << endl;
+
+        segment = ind(segment); // TODO Check that
+
+        if (segment && qtd_bytes) {
+            auto * element = new (phy2log(segment)) ListMegaPage::Element(segment, qtd_bytes);
+            ListMegaPage::Element * m1, * m2;
+            _free_mb.insert_merging(element, &m1, &m2);
+        } else {
+            db<MMU>(WRN) << "MMU::free_segment(segment=" << segment << ",qtd_bytes=" << qtd_bytes << "): failed" << endl;
+        }
+    }
+
+    // If it is allocable for page tables
+    static unsigned int allocable() { return _free.head() ? _free.head()->size() : 0; }
+
+    // Current PNN on SATP
+    static Page_Directory * volatile current() {
+        return static_cast<Page_Directory *>(phy2log((Phy_Addr)(CPU::satp() << PT_SHIFT)));
+    }
+
+    // Get physical address from logical address
+    static Phy_Addr physical(Log_Addr addr) {
+        Page_Directory * page_directory = current();
+        Page_Table * page_table = (*page_directory)[pdi(addr)];
+        return (*page_table)[pti(addr)] | off(addr);
+    }
+
+    // Multihart flush functions
     static void flush_tlb() { CPU::flush_tlb(); }
     static void flush_tlb(Log_Addr addr) { CPU::flush_tlb(addr); }
 
-    static void master(Page_Directory * master) { _master = master; }
-    static void mega_chunk(Page_Table * mega_chunk) { _mega_chunk = mega_chunk; }
+    // setters
+    static void set_master(Page_Directory * master) { _master = master; }
+
+    // SATP utils
+    static void set_satp() {
+        CPU::satp((1UL << 63) | reinterpret_cast<unsigned long>(_master) >> 12);
+    }
 
 private:
     static void init();
 
-    // PNN -> PTE
+    // Util functions
     static PT_Entry pnn2pte(Phy_Addr frame, RV64_Flags flags) { return (frame >> 2) | flags; }
-
-    // PNN -> PDE (Page Directory Entry = pte, but with X | R | W = 0)
     static PD_Entry pnn2pde(Phy_Addr frame) { return (frame >> 2) | RV64_Flags::VALID; }
+    static Log_Addr phy2log(const Phy_Addr & phy) { return phy; }
 
 private:
-    // Page tables
+    // Page tables (4Kb)
     static ListPage _free;
     static Page_Directory *_master;
 
-    // Page tables segments (chunks)
+    // Page tables segments (chunks) (2Mb)
     static ListMegaPage _free_mb;
-    static Page_Table *_mega_chunk;
 };
 
 __END_SYS

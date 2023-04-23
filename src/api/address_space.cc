@@ -7,11 +7,17 @@ __BEGIN_SYS
 Address_Space::Address_Space(MMU::Page_Directory * pd) : MMU::Directory(pd)
 {
     db<Address_Space> (TRC) << "Address_Space(pd=" << pd << ") [Directory::pd=" << Directory::pd() << "] => " << this << endl;
+
+    // activate SATP for MMU
+    Directory::activate();
 }
 
 Address_Space::Address_Space()
 {
     db<Address_Space> (TRC) << "Address_Space() [Directory::pd=" << Directory::pd() << "] => " << this << endl;
+
+    // activate SATP for MMU
+    Directory::activate();
 }
 
 Address_Space::~Address_Space()
