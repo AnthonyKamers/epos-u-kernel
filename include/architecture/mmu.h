@@ -31,6 +31,7 @@ protected:
     static const unsigned long PD_SHIFT = OFFSET_BITS + PT_BITS + AT_BITS;
 
     static const unsigned long PG_SIZE = 1UL << OFFSET_BITS;
+    static const unsigned long PG_CHUNK_SIZE = 1UL << PT_BITS;
     static const unsigned long PT_SPAN = 1UL << (OFFSET_BITS + PT_BITS);
     static const unsigned long AT_SPAN = 1UL << (OFFSET_BITS + PT_BITS + AT_BITS);
     static const unsigned long PD_SPAN = 1UL << (OFFSET_BITS + PT_BITS + AT_BITS + PD_BITS);
