@@ -77,10 +77,12 @@ public:
         }
 
         void remap(Phy_Addr addr, unsigned long from, unsigned long to, RV64_Flags flags) {
-            db<MMU>(INF) << "MMU::Page_Table::remap(addr=" << addr << ",from=" << from << ",to=" << to << ",flags=" << flags << ")" << endl;
+            db<MMU>(WRN) << "MMU::Page_Table::remap(addr=" << addr << ",from=" << from << ",to=" << to << ",flags=" << flags << ")" << endl;
 
             addr = align_page(addr);
+            db<MMU>(WRN) << "MMU::Page_Table::remap(alligned!=" << addr << endl;
             for(; from < to; from++) {
+            	db<MMU>(WRN) << "MMU::Page_Table::remap(Looking for stuff" << endl;
                 _page_table[from] = pnn2pte(addr, flags);
                 addr += sizeof(Frame);
             }
@@ -153,7 +155,7 @@ public:
             }
         }
 
-        Directory(Page_Directory *pd): _pd(pd), _free(false) {}
+        Directory(Page_Directory *pd): _pd(phy2log(calloc(1))), _free(false) {}
 
         ~Directory() { if(_free) free(_pd); }
 

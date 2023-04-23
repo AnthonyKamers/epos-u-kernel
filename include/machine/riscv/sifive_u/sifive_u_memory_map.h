@@ -26,7 +26,7 @@ public:
         BOOT_STACK      = (multitask ? INT_M2S : RAM_TOP + 1) - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
         FREE_BASE       = RAM_BASE,
         FREE_TOP        = BOOT_STACK,
-
+	        PAGE_TABLES     = BOOT_STACK - 64 * 1024 - ((1 + 512 + (512*512)) * 4096) + 1,
         // Memory-mapped devices
         BIOS_BASE       = 0x00001000,   // BIOS ROM
         TEST_BASE       = 0x00100000,   // SiFive test engine
