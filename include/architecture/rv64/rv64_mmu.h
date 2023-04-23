@@ -67,6 +67,8 @@ public:
         PT_Entry & operator[](unsigned int i) { return _page_table[i]; }
 
         void map(unsigned long from, unsigned long to, RV64_Flags flags) {
+            db<MMU>(INF) << "MMU::Page_Table::map(from=" << from << ",to=" << to << ",flags=" << flags << ")" << endl;
+
             Phy_Addr * addr = alloc(to - from);
             if (addr) remap(addr, from, to, flags);
             else
@@ -75,6 +77,8 @@ public:
         }
 
         void remap(Phy_Addr addr, unsigned long from, unsigned long to, RV64_Flags flags) {
+            db<MMU>(INF) << "MMU::Page_Table::remap(addr=" << addr << ",from=" << from << ",to=" << to << ",flags=" << flags << ")" << endl;
+
             addr = align_page(addr);
             for(; from < to; from++) {
                 _page_table[from] = pnn2pte(addr, flags);
