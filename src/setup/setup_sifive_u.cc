@@ -51,7 +51,6 @@ public:
 private:
     void say_hi();
     void call_next();
-    void build_pmm();
     void mmu_init();
 
 private:
@@ -74,9 +73,6 @@ Setup::Setup()
 
     // Print basic facts about this EPOS instance
     say_hi();
-
-    // build physical memory map
-    build_pmm();
 
     // Initialize MMU page tables
     mmu_init();
@@ -130,72 +126,6 @@ void Setup::call_next()
     db<Setup>(ERR) << "OS failed to init!" << endl;
 }
 
-void Setup::build_pmm()
-{
-    db<Setup>(TRC) << "Setup::build_pmm()" << endl;
-
-    // Allocate (reserve) memory for all entities we have to setup.
-    // We'll start at the highest address to make possible a memory model
-    // on which the application's logical and physical address spaces match.
-
-    Phy_Addr top_page = MMU::pages(si->bm.mem_top);
-
-    // Machine to Supervisor code (1 x sizeof(Page), not listed in the PMM)
-    top_page -= 1;
-
-    // System Info (1 x sizeof(Page))
-    top_page -= 1;
-    si->pmm.sys_info = top_page * sizeof(Page);
-
-    // System Page Table (1 x sizeof(Page))
-    top_page -= 1;
-    si->pmm.sys_pt = top_page * sizeof(Page);
-
-    // System Page Directory (1 x sizeof(Page))
-    top_page -= 1;
-    si->pmm.sys_pd = top_page * sizeof(Page);
-
-    // Page tables to map the whole physical memory
-    // = NP/NPTE_PT * sizeof(Page)
-    //   NP = size of physical memory in pages
-    //   NPTE_PT = number of page table entries per page table
-    top_page -= MMU::pts(MMU::pages(si->bm.mem_top - si->bm.mem_base));
-    si->pmm.phy_mem_pts = top_page * sizeof(Page);
-
-    // Page tables to map the IO address space
-    // = NP/NPTE_PT * sizeof(Page)
-    // NP = size of I/O address space in pages
-    // NPTE_PT = number of page table entries per page table
-    top_page -= MMU::pts(MMU::pages(si->bm.mio_top - si->bm.mio_base));
-    si->pmm.io_pts = top_page * sizeof(Page);
-
-    // SYSTEM code segment
-    top_page -= MMU::pages(si->lm.sys_code_size);
-    si->pmm.sys_code = top_page * sizeof(Page);
-
-    // SYSTEM data segment
-    top_page -= MMU::pages(si->lm.sys_data_size);
-    si->pmm.sys_data = top_page * sizeof(Page);
-
-    // SYSTEM stack segment
-    top_page -= MMU::pages(si->lm.sys_stack_size);
-    si->pmm.sys_stack = top_page * sizeof(Page);
-
-    // The memory allocated so far will "disappear" from the system as we set mem_top as follows:
-    si->pmm.usr_mem_base = si->bm.mem_base;
-    si->pmm.usr_mem_top = top_page * sizeof(Page);
-
-    // Free chunks (passed to MMU::init)
-    si->pmm.free1_base = si->lm.has_ext ? si->lm.app_extra + si->lm.app_extra_size : si->lm.app_data + si->lm.app_data_size;
-    si->pmm.free1_top = top_page * sizeof(Page);
-
-    // Test if we didn't overlap SETUP and the boot image
-    if(si->pmm.usr_mem_top <= si->lm.stp_code + si->lm.stp_code_size + si->lm.stp_data_size) {
-        db<Setup>(ERR) << "SETUP would have been overwritten!" << endl;
-        _panic();
-    }
-}
-
 
 void Setup::mmu_init() {
     unsigned int pt_entries = MMU::PT_ENTRIES;
@@ -210,28 +140,14 @@ void Setup::mmu_init() {
     kout << "attachers: " << attachers << endl;
     kout << "page directories: " << page_directories << endl << endl;
 
-    unsigned long base = si->pmm.free1_base;
-    unsigned long top = si->pmm.free1_top;
-    unsigned long size = top - base;
+    // Map L2 Page Directory
+    unsigned long base = RAM_BASE;
+    auto * master = new ((void *) (base)) Page_Directory();
+    master->remap(base, MMU::RV64_Flags::VALID);
 
-    // Make Page Directories (L2, L1, L0) -> Allocate sufficient space for it
-    // L2 -> Master Page Directory
-    // L1 and L0 -> Chunks
-    auto * l2_level = new ((void *) (base)) Page_Directory();
-    l2_level->map(base, top, MMU::RV64_Flags::CONTIGUOUS);
-    MMU::set_L2(l2_level);
-
-    base += size; top += size;
-
-    auto * l1_level = new ((void *) (base)) Page_Table();
-    l1_level->map(base, top, MMU::RV64_Flags::CONTIGUOUS);
-    MMU::set_L1(l1_level);
-
-    base += size; top += size;
-
-    auto * l0_level = new ((void *) (base)) Page_Table();
-    l0_level->map(base, top, MMU::RV64_Flags::CONTIGUOUS);
-    MMU::set_L0(l0_level);
+    // Set SATP (to change page allocation) + Flush old TLB
+    CPU::satp();
+    CPU::flush_tlb();
 }
 
 __END_SYS

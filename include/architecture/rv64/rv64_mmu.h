@@ -77,7 +77,7 @@ public:
             for (; from < to; from++) {
                 Log_Addr *page_table_entry = phy2log(&page_tables[from]);
                 *page_table_entry = phy2pte(addr, flags);
-                addr += sizeof(Page);
+                addr += sizeof(Frame);
             }
         }
 
@@ -103,35 +103,73 @@ public:
 
             _from = 0;
             _to = pages(bytes);
-            _pts = MMU::pts(_to);
             _bytes = bytes;
             _flags = RV64_Flags(flags);
 
-            // TODO: Need to have different behaviour for L0 and L1
-            _pt = calloc(_pts);
-            _pt->map(_from, _to, _flags);
+            // L0 (page table -> pts)
+            _l0_size = MMU::pts(_to - _from);
+            _l0 = calloc(_l0_size);
+            _l0->map(0, _l0_size, _flags);
+
+            // L1 (attacher -> ats)
+            _l1_size = MMU::ats(_l0_size);
+            _l1 = calloc(_l1_size);
+            _l1->map(_l0_size, _l0_size + _l1_size, _flags);
         }
 
         Chunk(Phy_Addr phy_addr, unsigned int bytes, Flags flags) {
             db<MMU>(INF) << "Called Chunk(phy_addr, bytes, flags)" << endl;
             _from = 0;
             _to = pages(bytes);
-            _pts = MMU::pts(_to);
             _bytes = bytes;
             _flags = RV64_Flags(flags);
+            _phy_addr = phy_addr;
 
-            // TODO: Need to have different behaviour for L0 and L1
-            _pt = calloc(_pts);
-            _pt->remap(phy_addr, _flags, _from, _to);
+            // L0 (page table -> pts)
+            _l0_size = MMU::pts(_to - _from);
+            _l0 = calloc(_l0_size);
+            _l0->remap(phy_addr, _flags, 0, _l0_size);
+
+            // L1 (attacher -> ats)
+            _l1_size = MMU::ats(_l0_size);
+            _l1 = calloc(_l1_size);
+            _l1->remap(phy_addr, _flags, _l0_size, _l0_size + _l1_size);
         }
 
         ~Chunk() {
-            for (; _from < _to; _from++) free((*static_cast<Page_Table *>(phy2log(_pt)))[_from]);
-            free(_pt, _pts); // the root page table is not destructed in the previous loop
+            for (; _from < _to; _from++) {
+                free((*static_cast<Page_Table *>(phy2log(_l1)))[_from]);
+                free((*static_cast<Page_Table *>(phy2log(_l0)))[_from]);
+            }
+            // the root page table is not destructed in the previous loop
+            free(_l0, _l0_size);
+            free(_l1, _l1_size);
         }
 
-        unsigned int pts() const { return _pts; }
-        Page_Table *pt() const { return _pt; }
+        // L0
+        unsigned int pts() const { return _l0_size; }
+        Page_Table *pt() const { return _l0; }
+
+        // L1
+        unsigned int ats() const { return _l1_size; }
+        Page_Table *at() const { return _l1; }
+
+        bool attach_entry(unsigned int from) const {
+            // run through level 1 (attacher)
+            for (; from < _l1_size; from++) {
+                if ((*_l1)[from]) return false;
+            }
+
+            // run though level 0 (page table) and check if l1 level is the same physical address
+            for (; from < _l0_size; from++) {
+                // TODO check same L1 attacher
+                if ((*_l0)[from]) return false;
+            }
+
+            // if arrived until here, there is enough space
+            return true;
+        }
+
         unsigned int size() const { return _bytes; }
         RV64_Flags flags() const {return _flags;}
         Phy_Addr phy_address() const { return _phy_addr; } // always CONTIGUOUS
@@ -139,11 +177,15 @@ public:
     private:
         unsigned int _from;
         unsigned int _to;
-        unsigned int _pts;
         unsigned int _bytes;
         RV64_Flags _flags;
         Phy_Addr _phy_addr;
-        Page_Table *_pt;
+
+        Page_Table * _l1;
+        unsigned int _l1_size;
+
+        Page_Table * _l0;
+        unsigned int _l0_size;
     };
 
     // Page Directory (L2)
@@ -183,7 +225,8 @@ public:
             unsigned int from = directory_bits(addr);
             for (; from < MMU::PD_ENTRIES; from++)
                 for (unsigned int i = 0; i < MMU::PT_ENTRIES; i++)
-                    return i << PD_SHIFT; // TODO necessary IF to check in which page table will make it
+                    if (chunk.attach_entry(i))
+                        return i << PD_SHIFT;
 
             // if arrived here, cannot attach to anything
             return false;
@@ -251,10 +294,6 @@ public:
         return static_cast<Page_Directory * volatile>(phy2log(CPU::satp() << 12));
     }
 
-    static void set_L2(Page_Directory * pd) { L2 = pd; }
-    static void set_L1(Page_Table * page_table) { L1 = page_table; }
-    static void set_L0(Page_Table * page_table) { L0 = page_table; }
-
     static void flush_tlb() { CPU::flush_tlb(); }
     static void flush_tlb(Log_Addr addr) { CPU::flush_tlb(addr); }
 
@@ -271,9 +310,6 @@ private:
 
 private:
     static List _free;
-    static Page_Directory * L2;
-    static Page_Table * L1;
-    static Page_Table * L0;
 
 };
 

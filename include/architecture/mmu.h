@@ -107,7 +107,7 @@ public:
 
     constexpr static Log_Addr directory_bits(Log_Addr addr) { return (addr & ~((1 << PD_BITS) - 1)); }
 
-    // Utils functions
+    // Util functions
     static bool is_leaf(PT_Entry entry) {return ((entry & 0xe) != 0);}
 };
 
@@ -142,9 +142,11 @@ public:
 
         ~Chunk() { free(_phy_addr, _bytes); }
 
+
+        bool attach_entry (unsigned int from) const{ return false; };
         unsigned int pts() const { return 0; }
-        Flags flags() const { return _flags; }
         Page_Table * pt() const { return 0; }
+        Flags flags() const { return _flags; }
         unsigned int size() const { return _bytes; }
         Phy_Addr phy_address() const { return _phy_addr; } // always CT
         int resize(unsigned int amount) { return 0; } // no resize in CT
