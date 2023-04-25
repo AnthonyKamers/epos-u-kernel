@@ -5,6 +5,25 @@
 #include <utility/elf.h>
 #include <utility/string.h>
 
+using namespace EPOS::S;
+typedef unsigned long Reg;
+
+
+// timer handler
+extern "C" [[gnu::interrupt, gnu::aligned(8)]] void _mmode_forward()
+{
+    Reg id = CPU::mcause();
+    if ((id & CLINT::INT_MASK) == CLINT::IRQ_MAC_TIMER)
+    {
+        Timer::reset();
+        CPU::sie(CPU::STI);
+    }
+    Reg interrupt_id = 1 << ((id & CLINT::INT_MASK) - 2);
+    if (CPU::int_enabled() && (CPU::sie() & (interrupt_id)))
+        CPU::mip(interrupt_id);
+}
+
+
 extern "C" {
     void _start();
 
@@ -141,9 +160,9 @@ void Setup::mmu_init() {
     kout << "page directories: " << page_directories << endl << endl;
 
     // Map L2 Page Directory
-    unsigned long base = RAM_BASE;
-    auto * master = new ((void *) (base)) Page_Directory();
-    master->remap(base, MMU::RV64_Flags::VALID);
+    //unsigned long base = RAM_BASE;
+    //auto * master = new ((void *) (base)) Page_Directory();
+    //master->remap(base, MMU::RV64_Flags::VALID);
 
     // Set SATP (to change page allocation) + Flush old TLB
     CPU::satp();
@@ -167,15 +186,26 @@ void _entry() // machine mode
     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP
 
     Machine::clear_bss();
+// Delegate all traps to supervisor
+    // Timer will not be delegated due to architecture reasons.
+    CPU::mideleg(CPU::SSI | CPU::STI | CPU::SEI);
+    CPU::medeleg(0xffff);
 
-    CPU::mstatus(CPU::MPP_M);                           // stay in machine mode at mret
+    CPU::mies(CPU::MSI | CPU::MTI | CPU::MEI);              // enable interrupts generation by CLINT
+    CPU::mint_disable();                                    // (mstatus) disable interrupts (they will be reenabled at Init_End)
+    CLINT::mtvec(CLINT::DIRECT, CPU::Reg(&_mmode_forward)); // setup a preliminary machine mode interrupt handler pointing it to _mmode_forward
 
+    // MPP_S = change to supervirsor
+    // MPIE = otherwise we won't ever receive interrupts
+    // CPU::mstatus(CPU::MPP_S);
+    CPU::mstatus(CPU::MPP_S | CPU::MPIE);
     CPU::mepc(CPU::Reg(&_setup));                       // entry = _setup
-    CPU::mret();                                        // enter supervisor mode at setup (mepc) with interrupts enabled (mstatus.mpie = true)
+    CPU::mret();
 }
 
 void _setup() // supervisor mode
 {
+    db<Setup>(WRN) << "Entrou no Setup" << endl;
     kerr  << endl;
     kout  << endl;
 
