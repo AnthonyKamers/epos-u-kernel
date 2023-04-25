@@ -81,6 +81,12 @@ public:
             }
         }
 
+//        void remap_equal(Phy_Addr addr, RV64_Flags flags) {
+//            addr = align_page(addr);
+//            PD_Entry *teste = phy2pde(addr);
+//            Log_Addr *page_table_entry = phy2pte(addr, flags);
+//        }
+
         // Print Page Table
         friend OStream & operator<<(OStream & os, Page_Table & pt) {
             os << "{\n";

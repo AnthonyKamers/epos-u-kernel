@@ -28,21 +28,21 @@ public:
         FREE_TOP        = BOOT_STACK,
 
         // Memory-mapped devices
-        BIOS_BASE       = 0x00001000,   // BIOS ROM
-        TEST_BASE       = 0x00100000,   // SiFive test engine
-        RTC_BASE        = 0x00101000,   // Goldfish RTC
-        UART0_BASE      = emulated ? 0x10000000 : 0x10010000, // NS16550A or SiFive UART
-        CLINT_BASE      = 0x02000000,   // SiFive CLINT
-        TIMER_BASE      = 0x02004000,   // CLINT Timer
-        PLIIC_CPU_BASE  = 0x0c000000,   // SiFive PLIC
-        PRCI_BASE       = emulated ? NOT_USED : 0x10000000,   // SiFive-U Power, Reset, Clock, Interrupt
-        GPIO_BASE       = emulated ? NOT_USED : 0x10060000,   // SiFive-U GPIO
-        OTP_BASE        = emulated ? NOT_USED : 0x10070000,   // SiFive-U OTP
-        ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
-        FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
-        SPI0_BASE       = 0x10040000,   // SiFive-U QSPI 0
-        SPI1_BASE       = 0x10041000,   // SiFive-U QSPI 1
-        SPI2_BASE       = 0x10050000,   // SiFive-U QSPI 2
+        BIOS_BASE       = 0x0000000000001000,   // BIOS ROM
+        TEST_BASE       = 0x0000000000100000,   // SiFive test engine
+        RTC_BASE        = 0x0000000000101000,   // Goldfish RTC
+        UART0_BASE      = emulated ? 0x0000000010000000 : 0x0000000010010000, // NS16550A or SiFive UART
+        CLINT_BASE      = 0x0000000002000000,   // SiFive CLINT
+        TIMER_BASE      = 0x0000000002004000,   // CLINT Timer
+        PLIIC_CPU_BASE  = 0x000000000c000000,   // SiFive PLIC
+        PRCI_BASE       = emulated ? NOT_USED : 0x0000000010000000,   // SiFive-U Power, Reset, Clock, Interrupt
+        GPIO_BASE       = emulated ? NOT_USED : 0x0000000010060000,   // SiFive-U GPIO
+        OTP_BASE        = emulated ? NOT_USED : 0x0000000010070000,   // SiFive-U OTP
+        ETH_BASE        = emulated ? NOT_USED : 0x0000000010090000,   // SiFive-U Ethernet
+        FLASH_BASE      = 0x0000000020000000,   // Virt / SiFive-U Flash
+        SPI0_BASE       = 0x0000000010040000,   // SiFive-U QSPI 0
+        SPI1_BASE       = 0x0000000010041000,   // SiFive-U QSPI 1
+        SPI2_BASE       = 0x0000000010050000,   // SiFive-U QSPI 2
 
         // Physical Memory at Boot
         BOOT            = Traits<Machine>::BOOT,
@@ -62,14 +62,14 @@ public:
         IO              = Traits<Machine>::IO,
 
         SYS             = Traits<Machine>::SYS,
-        SYS_CODE        = multitask ? SYS + 0x00000000 : NOT_USED,
-        SYS_INFO        = multitask ? SYS + 0x00100000 : NOT_USED,
-        SYS_PT          = multitask ? SYS + 0x00101000 : NOT_USED,
-        SYS_PD          = multitask ? SYS + 0x00102000 : NOT_USED,
-        SYS_DATA        = multitask ? SYS + 0x00103000 : NOT_USED,
-        SYS_STACK       = multitask ? SYS + 0x00200000 : NOT_USED,
-        SYS_HEAP        = multitask ? SYS + 0x00400000 : NOT_USED,
-        SYS_HIGH        = multitask ? SYS + 0x007fffff : NOT_USED
+        SYS_CODE        = multitask ? SYS + 0x0000000000000000 : NOT_USED,
+        SYS_INFO        = multitask ? SYS + 0x0000000000100000 : NOT_USED,
+        SYS_PT          = multitask ? SYS + 0x0000000000101000 : NOT_USED,
+        SYS_PD          = multitask ? SYS + 0x0000000000102000 : NOT_USED,
+        SYS_DATA        = multitask ? SYS + 0x0000000000103000 : NOT_USED,
+        SYS_STACK       = multitask ? SYS + 0x0000000000200000 : NOT_USED,
+        SYS_HEAP        = multitask ? SYS + 0x0000000000400000 : NOT_USED,
+        SYS_HIGH        = multitask ? SYS + 0x00000000007fffff : NOT_USED
     };
 };
 
