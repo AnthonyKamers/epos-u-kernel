@@ -428,6 +428,8 @@ public:
 
     static void sret() { ASM("sret"); }
 
+    static void pdp(Reg r) { CPU::satp((1UL << 63) | r >> 12); }
+
     static void satp(Reg r) { ASM("csrw satp, %0" : : "r"(r) : "cc"); }
     static Reg  satp() { Reg r; ASM("csrr %0, satp" :  "=r"(r) : : ); return r; }
 

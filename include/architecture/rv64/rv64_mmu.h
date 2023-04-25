@@ -19,7 +19,6 @@ class MMU: public MMU_Common<9, 21, 12> {
     friend class Setup;
 
 private:
-    typedef unsigned char MegaPage[PG_CHUNK_SIZE];  // 2Mb page
     typedef Grouping_List<Frame> ListPage;          // 4Kb page list
     typedef Grouping_List<MegaPage> ListMegaPage;   // 2Mb page list
 
@@ -86,6 +85,17 @@ public:
                 _page_table[from] = pnn2pte(addr, flags);
                 addr += sizeof(Frame);
             }
+        }
+
+        // Print Page Table
+        friend OStream & operator<<(OStream & os, Page_Table & pt) {
+            os << "{\n";
+            for (unsigned int i = 0; i < MMU::PT_ENTRIES; i++) {
+                if (pt[i])
+                    os << "\n";
+            }
+            os << "}";
+            return os;
         }
     private:
         PT_Entry _page_table[PT_ENTRIES];
@@ -330,13 +340,13 @@ private:
     // Util functions
     static PT_Entry pnn2pte(Phy_Addr frame, RV64_Flags flags) { return (frame >> 2) | flags; }
     static PD_Entry pnn2pde(Phy_Addr frame) { return (frame >> 2) | RV64_Flags::VALID; }
-    static Log_Addr phy2log(const Phy_Addr & phy) { return phy; }
+    static Log_Addr phy2log(const Phy_Addr & physical) { return physical; }
 
-    static PT_Entry phy2pte(Phy_Addr frame, Flags flags) { return frame; }
-    static Phy_Addr pte2phy(PT_Entry entry) { return entry; }
-    static PD_Entry phy2pde(Phy_Addr frame) { return frame; }
-    static Phy_Addr pde2phy(PD_Entry entry) { return entry; }
-    static Phy_Addr log2phy(Log_Addr log) { return log; }
+    static PD_Entry phy2pde(Phy_Addr bytes) { return ((bytes >> 12) << 10) | RV64_Flags::VALID; }
+    static Phy_Addr pde2phy(PD_Entry entry) { return (entry & ~RV64_Flags::MASK) << 2; }
+    static PT_Entry phy2pte(Phy_Addr bytes, RV64_Flags flags) { return ((bytes >> 12) << 10) | flags; }
+    static Phy_Addr pte2phy(PT_Entry entry) { return (entry & ~RV64_Flags::MASK) << 2; }
+    static RV64_Flags pde2flg(PT_Entry entry) { return (entry & RV64_Flags::MASK); }
 
 private:
     // Page tables (4Kb)

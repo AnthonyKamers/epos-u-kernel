@@ -38,8 +38,9 @@ protected:
 
 public:
     // Memory page
-    typedef unsigned char Page[PG_SIZE];
+    typedef unsigned char Page[PG_SIZE];            // 4Kb page
     typedef Page Frame;
+    typedef unsigned char MegaPage[PG_CHUNK_SIZE];  // 2Mb page
 
     // Page_Table, Attacher and Page_Directory entries
     typedef Phy_Addr PT_Entry;

@@ -48,6 +48,7 @@ private:
     typedef CPU::Log_Addr Log_Addr;
     typedef MMU::RV64_Flags RV64_Flags;
     typedef MMU::Page Page;
+    typedef MMU::MegaPage MegaPage;
     typedef MMU::PT_Entry PT_Entry;
     typedef MMU::Page_Table Page_Table;
     typedef MMU::Page_Directory Page_Directory;
@@ -140,7 +141,7 @@ void Setup::call_next()
 
 void Setup::build_pmm()
 {
-    db<Setup>(TRC) << "Setup::build_pmm()" << endl;
+    db<Setup>(INF) << "Setup::build_pmm()" << endl;
 
     // Allocate (reserve) memory for all entities we have to setup.
     // We'll start at the highest address to make possible a memory model
@@ -156,7 +157,7 @@ void Setup::build_pmm()
 
     // System Page Table (1 x sizeof(Page))
     top_page -= 1;
-    si->pmm.sys_pt = top_page * sizeof(Page);
+    si->pmm.sys_pt = top_page * sizeof(MegaPage);
 
     // System Page Directory (1 x sizeof(Page))
     top_page -= 1;
@@ -167,14 +168,14 @@ void Setup::build_pmm()
     //   NP = size of physical memory in pages
     //   NPTE_PT = number of page table entries per page table
     top_page -= MMU::pts(MMU::pages(si->bm.mem_top - si->bm.mem_base));
-    si->pmm.phy_mem_pt = top_page * sizeof(Page);
+    si->pmm.phy_mem_pt = top_page * sizeof(MegaPage);
 
     // Page tables to map the IO address space
     // = NP/NPTE_PT * sizeof(Page)
     // NP = size of I/O address space in pages
     // NPTE_PT = number of page table entries per page table
     top_page -= MMU::pts(MMU::pages(si->bm.mio_top - si->bm.mio_base));
-    si->pmm.io_pts = top_page * sizeof(Page);
+    si->pmm.io_pts = top_page * sizeof(MegaPage);
 
     // SYSTEM code segment
     top_page -= MMU::pages(si->lm.sys_code_size);
@@ -198,6 +199,8 @@ void Setup::build_pmm()
 }
 
 void Setup::setup_system_page_directory() {
+    db<Setup>(INF) << "Setup::setup_system_page_directory()" << endl;
+
     // Get the physical address for the System Page Directory
     PT_Entry * sys_pd = reinterpret_cast<PT_Entry *>(si->pmm.sys_pd);
 
@@ -211,15 +214,13 @@ void Setup::setup_system_page_directory() {
     // Map the whole physical memory into the page tables pointed by phy_mem_pts
     PT_Entry * pts = reinterpret_cast<PT_Entry *>(si->pmm.phy_mem_pt);
     for(unsigned int i = 0; i < mem_size; i++)
-        pts[i] = MMU::phy2pte((si->bm.mem_base + i * sizeof(Page)), MMU::Flags::SYS);
+        pts[i] = MMU::pnn2pte((si->bm.mem_base + i * sizeof(MegaPage)), MMU::Flags::SYS);
 
     // Attach all physical memory starting at PHY_MEM
-    assert((MMU::pdi(MMU::align_page(PHY_MEM)) + n_pts) < (MMU::PD_ENTRIES - 4)); // check if it would overwrite the OS
     for(unsigned int i = MMU::pdi(MMU::align_page(PHY_MEM)), j = 0; i < MMU::pdi(MMU::align_page(PHY_MEM)) + n_pts; i++, j++)
         sys_pd[i] = MMU::phy2pde((si->pmm.phy_mem_pt + j * sizeof(Page)));
 
     // Attach all physical memory starting at MEM_BASE
-    assert((MMU::pdi(MMU::align_page(MEM_BASE)) + n_pts) < (MMU::PD_ENTRIES - 4)); // check if it would overwrite the OS
     for(unsigned int i = MMU::pdi(MMU::align_page(MEM_BASE)), j = 0; i < MMU::pdi(MMU::align_page(MEM_BASE)) + n_pts; i++, j++)
         sys_pd[i] = MMU::phy2pde((si->pmm.phy_mem_pt + j * sizeof(Page)));
 
@@ -230,10 +231,9 @@ void Setup::setup_system_page_directory() {
     // Map IO address space into the page tables pointed by io_pts
     pts = reinterpret_cast<PT_Entry *>(si->pmm.io_pts);
     for(unsigned int i = 0; i < io_size; i++)
-        pts[i] = MMU::phy2pte((si->bm.mio_base + i * sizeof(Page)), MMU::Flags::IO);
+        pts[i] = MMU::pnn2pte((si->bm.mio_base + i * sizeof(MegaPage)), MMU::Flags::IO);
 
     // Attach devices' memory at Memory_Map::IO
-    assert((MMU::pdi(MMU::align_page(IO)) + n_pts) < (MMU::PD_ENTRIES - 3)); // check if it would overwrite the OS
     for(unsigned int i = MMU::pdi(MMU::align_page(IO)), j = 0; i < MMU::pdi(MMU::align_page(IO)) + n_pts; i++, j++)
         sys_pd[i] = MMU::phy2pde((si->pmm.io_pts + j * sizeof(Page)));
 
@@ -245,7 +245,7 @@ void Setup::setup_system_page_directory() {
 
 void Setup::mmu_init() {
     unsigned int pt_entries = MMU::PT_ENTRIES;
-    unsigned long pages = MMU::pages(RAM_TOP + 1);
+    unsigned long pages = MMU::pages(RAM_TOP - RAM_BASE + 1);
     unsigned int page_tables = MMU::pts(pages);
     unsigned int attachers = MMU::ats(page_tables);
     unsigned int page_directories = MMU::pds(attachers);
@@ -257,20 +257,12 @@ void Setup::mmu_init() {
     kout << "attachers: " << attachers << endl;
     kout << "page directories: " << page_directories << endl;
 
-    // Allocate page tables
-    Page_Directory * master = new ((void *) PAGE_TABLES) Page_Directory();
-     
-    kout << "master created!" << endl;
-    master->remap(PAGE_TABLES, 0, MMU::PD_ENTRIES, RV64_Flags::VALID);
-    
-    kout << "master remapped!" << endl;
-    MMU::set_master(master);
-
     // set SATP to enable paging for the MMU + Flush TLB
-    MMU::flush_tlb();
+    MMU::set_master(reinterpret_cast<Page_Directory *>(si->pmm.sys_pd));
+    CPU::pdp(si->pmm.sys_pd);
 
     kout << "tlb flushed!" << endl;
-    MMU::set_satp();
+    MMU::flush_tlb();
 
     kout << "satp set!" << endl;
 }
