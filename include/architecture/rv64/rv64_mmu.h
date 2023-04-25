@@ -81,12 +81,6 @@ public:
             }
         }
 
-//        void remap_equal(Phy_Addr addr, RV64_Flags flags) {
-//            addr = align_page(addr);
-//            PD_Entry *teste = phy2pde(addr);
-//            Log_Addr *page_table_entry = phy2pte(addr, flags);
-//        }
-
         // Print Page Table
         friend OStream & operator<<(OStream & os, Page_Table & pt) {
             os << "{\n";
@@ -307,7 +301,7 @@ private:
     static void init();
 
     // TODO check if these util functions are correct
-    static Log_Addr phy2log(Phy_Addr physical) { return physical; }
+    static Log_Addr phy2log(Phy_Addr const & physical)  { return physical; }
     static PD_Entry phy2pde(Phy_Addr bytes) { return ((bytes >> 12) << 10) | RV64_Flags::VALID; }
     static Phy_Addr pde2phy(PD_Entry entry) { return (entry & ~RV64_Flags::MASK) << 2; }
     static PT_Entry phy2pte(Phy_Addr bytes, RV64_Flags flags) { return ((bytes >> 12) << 10) | flags; }
