@@ -26,23 +26,24 @@ public:
         BOOT_STACK      = (multitask ? INT_M2S : RAM_TOP + 1) - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
         FREE_BASE       = RAM_BASE,
         FREE_TOP        = BOOT_STACK,
-	        PAGE_TABLES     = BOOT_STACK - 64 * 1024 - ((1 + 512 + (512*512)) * 4096) + 1,
+        // PAGE_TABLES     = BOOT_STACK - 64 * 1024 - ((1 + 512 + (512*512)) * 4096) + 1,
+        PAGE_TABLES     = BOOT_STACK - Traits<Machine>::STACK_SIZE - ((1 + 512 + (512*512)) * 4096) + 1,
         // Memory-mapped devices
-        BIOS_BASE       = 0x00001000,   // BIOS ROM
-        TEST_BASE       = 0x00100000,   // SiFive test engine
-        RTC_BASE        = 0x00101000,   // Goldfish RTC
-        UART0_BASE      = emulated ? 0x10000000 : 0x10010000, // NS16550A or SiFive UART
-        CLINT_BASE      = 0x02000000,   // SiFive CLINT
-        TIMER_BASE      = 0x02004000,   // CLINT Timer
-        PLIIC_CPU_BASE  = 0x0c000000,   // SiFive PLIC
-        PRCI_BASE       = emulated ? NOT_USED : 0x10000000,   // SiFive-U Power, Reset, Clock, Interrupt
-        GPIO_BASE       = emulated ? NOT_USED : 0x10060000,   // SiFive-U GPIO
-        OTP_BASE        = emulated ? NOT_USED : 0x10070000,   // SiFive-U OTP
-        ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
-        FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
-        SPI0_BASE       = 0x10040000,   // SiFive-U QSPI 0
-        SPI1_BASE       = 0x10041000,   // SiFive-U QSPI 1
-        SPI2_BASE       = 0x10050000,   // SiFive-U QSPI 2
+        BIOS_BASE       = 0x0000000000001000,   // BIOS ROM
+        TEST_BASE       = 0x0000000000100000,   // SiFive test engine
+        RTC_BASE        = 0x0000000000101000,   // Goldfish RTC
+        UART0_BASE      = emulated ? 0x0000000010000000 : 0x0000000010010000, // NS16550A or SiFive UART
+        CLINT_BASE      = 0x0000000002000000,   // SiFive CLINT
+        TIMER_BASE      = 0x0000000002004000,   // CLINT Timer
+        PLIIC_CPU_BASE  = 0x000000000c000000,   // SiFive PLIC
+        PRCI_BASE       = emulated ? NOT_USED : 0x0000000010000000,   // SiFive-U Power, Reset, Clock, Interrupt
+        GPIO_BASE       = emulated ? NOT_USED : 0x0000000010060000,   // SiFive-U GPIO
+        OTP_BASE        = emulated ? NOT_USED : 0x0000000010070000,   // SiFive-U OTP
+        ETH_BASE        = emulated ? NOT_USED : 0x0000000010090000,   // SiFive-U Ethernet
+        FLASH_BASE      = 0x0000000020000000,   // Virt / SiFive-U Flash
+        SPI0_BASE       = 0x0000000010040000,   // SiFive-U QSPI 0
+        SPI1_BASE       = 0x0000000010041000,   // SiFive-U QSPI 1
+        SPI2_BASE       = 0x0000000010050000,   // SiFive-U QSPI 2
 
         // Physical Memory at Boot
         BOOT            = Traits<Machine>::BOOT,

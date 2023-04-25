@@ -36,7 +36,7 @@ private:
     static const unsigned long FREE_TOP         = Memory_Map::FREE_TOP;
     static const unsigned long SETUP            = Memory_Map::SETUP;
     static const unsigned long BOOT_STACK       = Memory_Map::BOOT_STACK;
-    static const unsigned long PAGE_TABLES = Memory_Map::PAGE_TABLES;
+    static const unsigned long PAGE_TABLES      = Memory_Map::PAGE_TABLES;
     // Architecture Imports
     typedef CPU::Reg Reg;
     typedef CPU::Phy_Addr Phy_Addr;
@@ -141,24 +141,25 @@ void Setup::mmu_init() {
     kout << "attachers: " << attachers << endl;
     kout << "page directories: " << page_directories << endl;
 
-    unsigned long base = RAM_BASE + 4096 * 10;
+//    unsigned long base = RAM_BASE + 4096 * 10;
 //    unsigned long top = RAM_TOP;
 
     // Allocate page tables
-    Page_Directory * master = new ((void *) base) Page_Directory();
+    Page_Directory * master = new ((void *) PAGE_TABLES) Page_Directory();
      
     kout << "master created!" << endl;
-    master->remap(base, 0, MMU::PD_ENTRIES, RV64_Flags::VALID);
+//    master->remap(PAGE_TABLES, 0, MMU::PD_ENTRIES, RV64_Flags::VALID);
     
     kout << "master remapped!" << endl;
     MMU::set_master(master);
 
-    kout << "master set!" << endl;
     // set SATP to enable paging for the MMU + Flush TLB
-    MMU::set_satp();
-    kout << "satp set!" << endl;
     MMU::flush_tlb();
+
     kout << "tlb flushed!" << endl;
+    MMU::set_satp();
+
+    kout << "satp set!" << endl;
 }
 
 __END_SYS
@@ -173,6 +174,7 @@ void _entry() // machine mode
     CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
     CPU::mies(CPU::MSI);                                // enable interrupts generation by CLINT
     CLINT::mtvec(CLINT::DIRECT, _int_entry);            // setup a preliminary machine mode interrupt handler pointing it to _int_entry
+    CLINT::stvec(CLINT::DIRECT, _int_entry);            // setup a preliminary machine mode interrupt handler pointing it to _int_entry
 
     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP
 
