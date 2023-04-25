@@ -145,7 +145,7 @@ void Setup::mmu_init() {
 //    unsigned long top = RAM_TOP;
 
     // Allocate page tables
-    Page_Directory * master = new ((void *) PAGE_TABLES) Page_Directory();
+    Page_Directory * master = new ((void *) base) Page_Directory();
      
     kout << "master created!" << endl;
     master->remap(base, 0, MMU::PD_ENTRIES, RV64_Flags::VALID);
