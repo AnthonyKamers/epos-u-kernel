@@ -425,6 +425,15 @@ public:
 
     static void sret() { ASM("sret"); }
 
+    static void pmpcfg0(Reg r)   { ASM("csrw pmpcfg0, %0" : : "r"(r) : "cc"); }
+    static Reg  pmpcfg0() { Reg r; ASM("csrr %0, pmpcfg0" :  "=r"(r) : : ); return r; }
+
+    static void pmpaddr0(Reg r)   { ASM("csrw pmpaddr0, %0" : : "r"(r) : "cc"); }
+    static Reg  pmpaddr0() { Reg r; ASM("csrr %0, pmpaddr0" :  "=r"(r) : : ); return r; }
+
+    static Reg pdp() { return (satp() << 12); }
+    static void pdp(Reg pdp) { satp((1 << 31) | (pdp >> 12)); }
+
     static void satp(Reg r) { ASM("csrw satp, %0" : : "r"(r) : "cc"); }
     static Reg  satp() { Reg r; ASM("csrr %0, satp" :  "=r"(r) : : ); return r; }
 

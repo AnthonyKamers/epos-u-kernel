@@ -154,7 +154,7 @@ public:
         unsigned int ats() const { return _l1_size; }
         Page_Table *at() const { return _l1; }
 
-        bool attach_entry(unsigned int from) const {
+        bool attach_entry(unsigned int from, unsigned int i) const {
             // run through level 1 (attacher)
             for (; from < _l1_size; from++) {
                 if ((*_l1)[from]) return false;
@@ -198,7 +198,7 @@ public:
         
         explicit Directory(Page_Directory *pd): _pd(pd), _free(false) {
             db<MMU>(INF) << "Call Directory()" << endl;
-            for (unsigned int i = 0; i < MMU::PD_ENTRIES; i++) (*_pd)[i] = L2->get_entry(i);
+            for (unsigned int i = 0; i < MMU::PD_ENTRIES; i++) (*_pd)[i] = _pd->get_entry(i);
         }
         
         ~Directory() {
@@ -225,7 +225,7 @@ public:
             unsigned int from = directory_bits(addr);
             for (; from < MMU::PD_ENTRIES; from++)
                 for (unsigned int i = 0; i < MMU::PT_ENTRIES; i++)
-                    if (chunk.attach_entry(i))
+                    if (chunk.attach_entry(from, i))
                         return i << PD_SHIFT;
 
             // if arrived here, cannot attach to anything
