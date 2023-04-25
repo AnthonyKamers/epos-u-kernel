@@ -332,6 +332,12 @@ private:
     static PD_Entry pnn2pde(Phy_Addr frame) { return (frame >> 2) | RV64_Flags::VALID; }
     static Log_Addr phy2log(const Phy_Addr & phy) { return phy; }
 
+    static PT_Entry phy2pte(Phy_Addr frame, Flags flags) { return frame; }
+    static Phy_Addr pte2phy(PT_Entry entry) { return entry; }
+    static PD_Entry phy2pde(Phy_Addr frame) { return frame; }
+    static Phy_Addr pde2phy(PD_Entry entry) { return entry; }
+    static Phy_Addr log2phy(Log_Addr log) { return log; }
+
 private:
     // Page tables (4Kb)
     static ListPage _free;
