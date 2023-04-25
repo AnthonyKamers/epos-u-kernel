@@ -63,6 +63,8 @@ private:
     typedef MMU::PT_Entry PT_Entry;
     typedef MMU::Flags Flags;
     typedef MMU::RV64_Flags RV64_Flags;
+    typedef MMU::Directory Directory;
+    typedef MMU::Chunk Chunk;
 
 public:
     Setup();
@@ -70,6 +72,9 @@ public:
 private:
     void say_hi();
     void call_next();
+
+    void build_pmm();
+    void setup_sys_pd();
 
     // mmu
     void mmu_init();
@@ -94,9 +99,13 @@ Setup::Setup()
     db<Setup>(INF) << "Setup:si=" << *si << endl;
 
     // Print basic facts about this EPOS instance
-     say_hi();
+    say_hi();
+
+    // build physical memory map
+    build_pmm();
 
     // Make MMU page tables
+    setup_sys_pd();
     mmu_init();
 
     // SETUP ends here, so let's transfer control to the next stage (INIT or APP)
@@ -148,9 +157,135 @@ void Setup::call_next()
     db<Setup>(ERR) << "OS failed to init!" << endl;
 }
 
+void Setup::build_pmm()
+{
+    db<Setup>(TRC) << "Setup::build_pmm()" << endl;
+
+    // Allocate (reserve) memory for all entities we have to setup.
+    // We'll start at the highest address to make possible a memory model
+    // on which the application's logical and physical address spaces match.
+
+    Phy_Addr top_page = MMU::pages(si->bm.mem_top);
+
+    // Machine to Supervisor code (1 x sizeof(Page), not listed in the PMM)
+    top_page -= 1;
+
+    // System Info (1 x sizeof(Page))
+    top_page -= 1;
+    si->pmm.sys_info = top_page * sizeof(Page);
+
+    // System Page Table (1 x sizeof(Page))
+    top_page -= 1;
+    si->pmm.sys_pt = top_page * sizeof(Page);
+
+    // System Page Directory (1 x sizeof(Page))
+    top_page -= 1;
+    si->pmm.sys_pd = top_page * sizeof(Page);
+
+    // Page tables to map the whole physical memory
+    // = NP/NPTE_PT * sizeof(Page)
+    //   NP = size of physical memory in pages
+    //   NPTE_PT = number of page table entries per page table
+    top_page -= MMU::pts(MMU::pages(si->bm.mem_top - si->bm.mem_base));
+    si->pmm.phy_mem_pts = top_page * sizeof(Page);
+
+    // Page tables to map the IO address space = NP/NPTE_PT * sizeof(Page)
+    // NP = size of I/O address space in pages
+    // NPTE_PT = number of page table entries per page table
+    top_page -= MMU::pts(MMU::pages(si->bm.mio_top - si->bm.mio_base));
+    si->pmm.io_pts = top_page * sizeof(Page);
+
+    // SYSTEM code segment
+    top_page -= MMU::pages(si->lm.sys_code_size);
+    si->pmm.sys_code = top_page * sizeof(Page);
+
+    // SYSTEM data segment
+    top_page -= MMU::pages(si->lm.sys_data_size);
+    si->pmm.sys_data = top_page * sizeof(Page);
+
+    // SYSTEM stack segment
+    top_page -= MMU::pages(si->lm.sys_stack_size);
+    si->pmm.sys_stack = top_page * sizeof(Page);
+
+    // The memory allocated so far will "disappear" from the system as we set mem_top as follows:
+    si->pmm.usr_mem_base = si->bm.mem_base;
+    si->pmm.usr_mem_top = top_page * sizeof(Page);
+
+    // Free chunks (passed to MMU::init)
+    si->pmm.free1_base = RAM_BASE;
+    si->pmm.free1_top = RAM_TOP;
+}
+
+void Setup::setup_sys_pd()
+{
+    db<Setup>(TRC) << "setup_sys_pd(bm="
+                   << "{memb="  << (void *)si->bm.mem_base
+                   << ",memt="  << (void *)si->bm.mem_top
+                   << ",miob="  << (void *)si->bm.mio_base
+                   << ",miot="  << (void *)si->bm.mio_top
+                   << "{si="    << (void *)si->pmm.sys_info
+                   << ",spt="   << (void *)si->pmm.sys_pt
+                   << ",spd="   << (void *)si->pmm.sys_pd
+                   << ",mem="   << (void *)si->pmm.phy_mem_pts
+                   << ",io="    << (void *)si->pmm.io_pts
+                   << ",umemb=" << (void *)si->pmm.usr_mem_base
+                   << ",umemt=" << (void *)si->pmm.usr_mem_top
+                   << ",sysc="  << (void *)si->pmm.sys_code
+                   << ",sysd="  << (void *)si->pmm.sys_data
+                   << ",syss="  << (void *)si->pmm.sys_stack
+                   << ",apct="  << (void *)si->pmm.app_code_pt
+                   << ",apdt="  << (void *)si->pmm.app_data_pt
+                   << ",fr1b="  << (void *)si->pmm.free1_base
+                   << ",fr1t="  << (void *)si->pmm.free1_top
+                   << ",fr2b="  << (void *)si->pmm.free2_base
+                   << ",fr2t="  << (void *)si->pmm.free2_top
+                   << "})" << endl;
+
+    // Get the physical address for the System Page Directory
+    PT_Entry * sys_pd = reinterpret_cast<PT_Entry *>(si->pmm.sys_pd);
+
+    // Clear the System Page Directory
+    memset(sys_pd, 0, sizeof(Page));
+
+    // Calculate the number of page tables needed to map the physical memory
+    unsigned int mem_size = MMU::pages(si->bm.mem_top - si->bm.mem_base);
+    unsigned int n_pts = MMU::pts(mem_size);
+
+    // Map the whole physical memory into the page tables pointed by phy_mem_pts
+    PT_Entry * pts = reinterpret_cast<PT_Entry *>(si->pmm.phy_mem_pts);
+    for(unsigned int i = 0; i < mem_size; i++)
+        pts[i] = MMU::phy2pte((si->bm.mem_base + i * sizeof(Page)), Flags::SYS);
+
+    // Attach all physical memory starting at PHY_MEM
+    for(unsigned int i = MMU::pdi(MMU::align_segment(PHY_MEM)), j = 0; i < MMU::pdi(MMU::align_segment(PHY_MEM)) + n_pts; i++, j++)
+        sys_pd[i] = MMU::phy2pde((si->pmm.phy_mem_pts + j * sizeof(Page)));
+
+    // Attach all physical memory starting at MEM_BASE
+    for(unsigned int i = MMU::pdi(MMU::align_segment(RAM_BASE)), j = 0; i < MMU::pdi(MMU::align_segment(RAM_BASE)) + n_pts; i++, j++)
+        sys_pd[i] = MMU::phy2pde((si->pmm.phy_mem_pts + j * sizeof(Page)));
+
+    // Calculate the number of page tables needed to map the IO address space
+    unsigned int io_size = MMU::pages(si->bm.mio_top - si->bm.mio_base);
+    n_pts = MMU::pts(io_size);
+
+    // Map IO address space into the page tables pointed by io_pts
+    pts = reinterpret_cast<PT_Entry *>(si->pmm.io_pts);
+    for(unsigned int i = 0; i < io_size; i++)
+        pts[i] = MMU::phy2pte((si->bm.mio_base + i * sizeof(Page)), Flags::IO);
+
+    // Attach devices' memory at Memory_Map::IO
+    for(unsigned int i = MMU::pdi(MMU::align_segment(MIO_BASE)), j = 0; i < MMU::pdi(MMU::align_segment(MIO_BASE)) + n_pts; i++, j++)
+        sys_pd[i] = MMU::phy2pde((si->pmm.io_pts + j * sizeof(Page)));
+
+    // Attach the OS (i.e. sys_pt)
+    sys_pd[MMU::pdi(SETUP)] = MMU::phy2pde(si->pmm.sys_pt);
+
+    db<Setup>(INF) << "SYS_PD=" << *reinterpret_cast<Page_Table *>(sys_pd) << endl;
+}
+
 void Setup::mmu_init() {
     unsigned int pt_entries = PT_ENTRIES;
-    unsigned long pages = MMU::pages(RAM_TOP + 1);
+    unsigned long pages = MMU::pages(RAM_TOP - RAM_BASE + 1);
     unsigned int page_tables = MMU::pts(pages);
     unsigned int attachers = MMU::ats(page_tables);
     unsigned int page_directories = MMU::pds(attachers);
@@ -161,75 +296,9 @@ void Setup::mmu_init() {
     kout << "page tables: " << page_tables << endl;
     kout << "attachers: " << attachers << endl;
     kout << "page directories: " << page_directories << endl;
-    kout << "PD_ENTRIES: " << PD_ENTRIES << endl;
-    kout << "AT_ENTRIES: " << AT_ENTRIES << endl;
-    kout << "PT_ENTRIES: " << PT_ENTRIES << endl;
-
-    // Map L2 Page Directory
-    Phy_Addr L2_Addr = RAM_BASE;
-    auto * L2 = new ((void *) (L2_Addr)) Page_Directory();
-    L2_Addr += PG_SIZE;
-    L2->remap(L2_Addr, MMU::RV64_Flags::VALID, 0, PD_ENTRIES);
-
-    // Map L1 Page Table (Attacher -> Chunk)
-    Phy_Addr L1_Addr = L2_Addr + AT_ENTRIES * PG_SIZE;
-    for (unsigned long i = 0; i < PD_ENTRIES; i++) {
-        Page_Table * L1 = new ((void *)L2_Addr) Page_Table();
-        L2_Addr += PG_SIZE;
-
-        L1->remap(L1_Addr, MMU::RV64_Flags::VALID, 0, AT_ENTRIES);
-        L1_Addr += AT_ENTRIES * PG_SIZE;
-    }
-
-    // Map L0 Page Table (Final Page Table -> Chunk)
-    Phy_Addr L0_Addr = L1_Addr;
-    L1_Addr = 0;
-    for (unsigned long i = 0; i < PD_ENTRIES; i++)
-        for (unsigned long j = 0; j < AT_ENTRIES; j++) {
-            Page_Table * L0 = new ((void *)L0_Addr) Page_Table();
-            L0_Addr += PG_SIZE;
-
-            L0->remap(L1_Addr, MMU::RV64_Flags::VALID, 0, PT_ENTRIES);
-            L1_Addr += PT_ENTRIES * PG_SIZE;
-        }
-
-    kout << "Last Directory: " << L2_Addr << endl;
-    kout << "Last Page: " << L1_Addr << endl << endl;
-
-    kout << "MMU -> System Mapping (System + IO)" << endl;
-
-    // System Page Directory (System + IO Address Space)
-    unsigned sys_pages = MMU::pages(SYS_HEAP - INIT);
-    unsigned sys_pts = MMU::pts(sys_pages);
-    unsigned sys_attachers = MMU::ats(sys_pts);
-    unsigned sys_pds = MMU::pds(sys_attachers);
-    Phy_Addr addr = PAGE_TABLES + (1 + sys_attachers) * PG_SIZE;
-
-    kout << "sys_attachers = " << sys_attachers << endl;
-    kout << "sys_pds = " << sys_pds << endl;
-
-    L2->remap(addr, MMU::RV64_Flags::VALID, sys_attachers, sys_attachers + 1);
-    Page_Directory * sys_pd = new ((void *)addr) Page_Directory();
-    addr = PAGE_TABLES + (1 + PD_ENTRIES + AT_ENTRIES * PD_ENTRIES) * PG_SIZE;
-    sys_pd->remap(addr, MMU::RV64_Flags::VALID, 0, sys_pts);
-
-    unsigned long sys_addr = PAGE_TABLES + (1 + PD_ENTRIES + PD_ENTRIES * PD_ENTRIES - sys_pages) * PG_SIZE;
-    for (unsigned long i = 0; i < sys_pts; i++) {
-        Page_Table * sys_pt = new ((void *)addr) Page_Table();
-        addr += PG_SIZE;
-        sys_pt->remap(sys_addr, Flags::SYS);
-        sys_addr += PD_ENTRIES * PG_SIZE;
-    }
-
-    db<Setup>(INF) << "addr = " << hex << addr << endl;
-    db<Setup>(INF) << "sys_addr = " << sys_addr << endl;
-
-    // update free memory (to initialize the free space list in rv64_mmu_init.cc
-    si->pmm.free1_base = RAM_BASE;
-    si->pmm.free1_top = addr;
 
     // Set SATP (to change page allocation) + Flush old TLB
-    CPU::pdp(reinterpret_cast<unsigned long>(L2));
+    CPU::pdp(si->pmm.sys_pd);
     CPU::flush_tlb();
 }
 
@@ -261,6 +330,7 @@ void _entry() // machine mode
 
     CPU::mies(CPU::MSI | CPU::MTI | CPU::MEI); // enable interrupts generation by CLINT // (mstatus) disable interrupts (they will be reenabled at Init_End)
     CLINT::mtvec(CLINT::DIRECT, _int_entry); // setup a preliminary machine mode interrupt handler pointing it to _mmode_forward
+    CLINT::stvec(CLINT::DIRECT, _int_entry); // setup a preliminary supervisor mode interrupt handler pointing it to _mmode_forward
 
     // MPP_S = change to supervirsor
     // MPIE = otherwise we won't ever receive interrupts

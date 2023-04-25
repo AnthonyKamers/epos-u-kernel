@@ -143,7 +143,7 @@ public:
         ~Chunk() { free(_phy_addr, _bytes); }
 
 
-        bool attach_entry (unsigned int from, unsigned int i) const{ return false; };
+        bool attach_entry (unsigned int i) const{ return false; };
         unsigned int pts() const { return 0; }
         Page_Table * pt() const { return 0; }
         Flags flags() const { return _flags; }
