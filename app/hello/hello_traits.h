@@ -21,7 +21,7 @@ template<> struct Traits<Build>: public Traits_Tokens
     static const bool enabled = true;
     static const bool monitored = true;
     static const bool debugged = true;
-    static const bool hysterically_debugged = false;
+    static const bool hysterically_debugged = true;
 
     // Default aspects
     typedef ALIST<> ASPECTS;
@@ -33,8 +33,8 @@ template<> struct Traits<Debug>: public Traits<Build>
 {
     static const bool error   = true;
     static const bool warning = true;
-    static const bool info    = false;
-    static const bool trace   = false;
+    static const bool info    = true;
+    static const bool trace   = true;
 };
 
 template<> struct Traits<Lists>: public Traits<Build>
@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
 {
     static const unsigned int mode = Traits<Build>::MODE;
     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
+    static const bool multitask = true;
     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
 
     static const unsigned long LIFE_SPAN = 1 * YEAR; // s

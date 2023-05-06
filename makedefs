@@ -81,7 +81,7 @@ LSYS		= $(LSYSNAME)_$(MMOD)
 LINIT		= $(LINITNAME)_$(MMOD)
 LUTIL		= $(LUTILNAME)_$(MMOD)
 ifeq ($(SMOD), library)
-BOOT_ROM	= 
+BOOT_ROM	= -device loader,file=$(APPLICATION).img,addr=$(IMAGE_ADDR),force-raw=on  
 else
 BOOT_ROM	= -device loader,file=$(APPLICATION).img,addr=$(IMAGE_ADDR),force-raw=on 
 endif
