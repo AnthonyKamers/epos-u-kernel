@@ -449,18 +449,20 @@ private:
     static unsigned int _bus_clock;
 };
 
+// with multitask = true, it will be in supervisor mode, thus it is necessary to change
+// all the machine registers to supervisor registers
 inline void CPU::Context::push(bool interrupt)
 {
     ASM("       addi     sp, sp, %0             \n" : : "i"(-sizeof(Context))); // adjust SP for the pushes below
 
 if(interrupt) {
-    ASM("       csrr     x3,    mepc            \n"
+    ASM("       csrr     x3,    sepc            \n"
         "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
 } else {
     ASM("       sw       x1,    0(sp)           \n");   // push RA as PC on context switches
 }
 
-    ASM("       csrr     x3,  mstatus           \n");
+    ASM("       csrr     x3,  sstatus           \n");
 
     ASM("       sd       x3,    8(sp)           \n"     // push ST
         "       sd       x1,   16(sp)           \n"     // push RA
@@ -499,7 +501,7 @@ inline void CPU::Context::pop(bool interrupt)
 if(interrupt) {
     ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
 }
-    ASM("       csrw     mepc, x3               \n");   // MEPC = PC
+    ASM("       csrw     sepc, x3               \n");   // MEPC = PC
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
 if(!interrupt) {
@@ -537,7 +539,7 @@ if(!interrupt) {
         "       ld      x31,  232(sp)           \n"
         "       addi    sp, sp, %0              \n" : : "i"(sizeof(Context))); // complete the pops above by adjusting SP
 
-    ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
+    ASM("       csrw    sstatus, x3             \n");   // MSTATUS = ST
 }
 
 inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }
