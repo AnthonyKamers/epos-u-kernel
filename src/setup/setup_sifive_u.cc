@@ -140,7 +140,7 @@ Setup::Setup()
         setup_sys_pd();
 
         // Relocate the machine to supervisor interrupt forwarder
-        setup_m2s();
+//        setup_m2s();
 
         // Enable paging
         enable_paging();
@@ -719,7 +719,7 @@ void _entry() // machine mode
     Machine::clear_bss();
 
     if(Traits<System>::multitask) {
-        // CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
+//        CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
         CPU::mideleg(0xffff);                           // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
         CPU::medeleg(0xffff);                           // delegate all exceptions to supervisor mode
         CPU::mstatuss(CPU::MPP_S);                      // prepare jump into supervisor mode at mret
