@@ -140,7 +140,7 @@ Setup::Setup()
         setup_sys_pd();
 
         // Relocate the machine to supervisor interrupt forwarder
-        setup_m2s();
+        //setup_m2s();
 
         // Enable paging
         enable_paging();
