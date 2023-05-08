@@ -21,7 +21,7 @@ template<> struct Traits<Build>: public Traits_Tokens
     static const bool enabled = true;
     static const bool monitored = true;
     static const bool debugged = true;
-    static const bool hysterically_debugged = true;
+    static const bool hysterically_debugged = false;
 
     // Default aspects
     typedef ALIST<> ASPECTS;
