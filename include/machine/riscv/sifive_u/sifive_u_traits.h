@@ -34,18 +34,18 @@ public:
 
     // Physical Memory at Boot
     static const unsigned int BOOT              = NOT_USED;
-    static const unsigned int SETUP             = library ? NOT_USED : RAM_BASE;        // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
+    static const unsigned int SETUP             = RAM_BASE;        // library ? NOT_USED : RAM_BASE; RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
     static const unsigned int IMAGE             = 0x80100000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
 
     // Logical Memory
-    static const unsigned int APP_LOW           = library ? RAM_BASE : 0x80400000;      // 2 GB + 4 MB
+    static const unsigned int APP_LOW           = 0x80400000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
     static const unsigned int APP_HIGH          = 0xff7fffff;                           // SYS - 1
 
     static const unsigned int APP_CODE          = APP_LOW;
     static const unsigned int APP_DATA          = APP_CODE + 4 * 1024 * 1024;
 
-    static const unsigned int INIT              = library ? NOT_USED : 0x80080000;      // RAM_BASE + 512 KB (will be part of the free memory at INIT)
-    static const unsigned int PHY_MEM           = library ? RAM_BASE : 0x20000000;      // 512 MB (max 1536 MB of RAM)
+    static const unsigned int INIT              = 0x80080000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
+    static const unsigned int PHY_MEM           = 0x20000000;      // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
     static const unsigned int IO                = 0x00000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
     static const unsigned int SYS               = 0xff800000;                           // 4 GB - 8 MB
 
@@ -71,6 +71,7 @@ template <> struct Traits<Timer>: public Traits<Machine_Common>
     // choice must respect the scheduler time-slice, i. e., it must be higher
     // than the scheduler invocation frequency.
     static const int FREQUENCY = 1000; // Hz
+    static const bool enabled = false;
 };
 
 template <> struct Traits<UART>: public Traits<Machine_Common>

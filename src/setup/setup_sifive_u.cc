@@ -193,11 +193,11 @@ void Setup::build_lm()
     db<Setup>(TRC) << "Setup::build_lm()" << endl;
 
     // Get boot image structure
-    si->lm.has_stp = (si->bm.setup_offset != -1u);
-    si->lm.has_ini = (si->bm.init_offset != -1u);
-    si->lm.has_sys = (si->bm.system_offset != -1u);
-    si->lm.has_app = (si->bm.application_offset != -1u);
-    si->lm.has_ext = (si->bm.extras_offset != -1u);
+    si->lm.has_stp = (si->bm.setup_offset != -1ul);
+    si->lm.has_ini = (si->bm.init_offset != -1ul);
+    si->lm.has_sys = (si->bm.system_offset != -1ul);
+    si->lm.has_app = (si->bm.application_offset != -1ul);
+    si->lm.has_ext = (si->bm.extras_offset != -1ul);
 
     // Check SETUP integrity and get the size of its segments
     if(si->lm.has_stp) {
