@@ -519,7 +519,7 @@ if(interrupt) {
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
 if(!interrupt) {
-    ASM("       li       a0, 3 << 8            \n"     // use a0 as a second TMP, since it will be restored later
+    ASM("       li       a0, 1 << 8            \n"     // use a0 as a second TMP, since it will be restored later
         "       or       x3, x3, a0             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
 }
 
