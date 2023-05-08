@@ -441,7 +441,7 @@ void Setup::setup_app_pt()
     // APPLICATION code
     // Since load_parts() will load the code into memory, the code segment can't be marked R/O yet
     // The correct flags (APPC and APPD) will be configured after the execution of load_parts(), by adjust_perms()
-    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APP);
+    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::SYS);
 
     // APPLICATION data (contains stack, heap and extra)
     app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APP);
@@ -744,7 +744,7 @@ void _entry() // machine mode
         CPU::mstatus(CPU::MPP_M);                       // stay in machine mode at mret
     }
 
-    CPU::pmpcfg0(0b11111); 				// configure PMP region 0 as (L=unlocked [0], [00], A = NAPOT [11], X [1], W [1], R [1])
+    CPU::pmpcfg0(0b11111); 				               // configure PMP region 0 as (L=unlocked [0], [00], A = NAPOT [11], X [1], W [1], R [1])
     CPU::pmpaddr0((1ULL << MMU::LA_BITS) - 1);          // comprising the whole memory space
 
     CPU::mepc(CPU::Reg(&_setup));                       // entry = _setup

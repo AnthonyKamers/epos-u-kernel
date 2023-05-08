@@ -558,7 +558,7 @@ if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP i
     } else {
         ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
     }
-
+    
 }
 
 inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }
