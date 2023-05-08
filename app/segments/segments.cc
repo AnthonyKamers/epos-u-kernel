@@ -41,20 +41,20 @@ int main()
     cout << "Extra 1 : " << extra1 << " | " << MMU::pte2phy(extra1) << endl;
     cout << "Extra 2 : " << extra2 << " | " << MMU::pte2phy(extra2) << endl;
 
-//    cout << "Clearing segments:";
-//    memset(extra1, 0, ES1_SIZE);
-//    memset(extra2, 0, ES2_SIZE);
-//    cout << "  done!" << endl;
-//
-//    cout << "Detaching segments:";
-//    self.detach(es1);
-//    self.detach(es2);
-//    cout << "  done!" << endl;
-//
-//    cout << "Deleting segments:";
-//    delete es1;
-//    delete es2;
-//    cout << "  done!" << endl;
+    cout << "Clearing segments:";
+    memset(extra1, 0, ES1_SIZE);
+    memset(extra2, 0, ES2_SIZE);
+    cout << "  done!" << endl;
+
+    cout << "Detaching segments:";
+    self.detach(es1);
+    self.detach(es2);
+    cout << "  done!" << endl;
+
+    cout << "Deleting segments:";
+    delete es1;
+    delete es2;
+    cout << "  done!" << endl;
 
     cout << "I'm done, bye!" << endl;
 
