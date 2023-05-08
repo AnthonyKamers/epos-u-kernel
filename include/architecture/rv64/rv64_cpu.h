@@ -449,25 +449,31 @@ private:
     static unsigned int _bus_clock;
 };
 
+
+//Change the CSR based on the current mode
 inline void CPU::Context::push(bool interrupt)
 {
     ASM("       addi     sp, sp, %0             \n" : : "i"(-sizeof(Context))); // adjust SP for the pushes below
+
 if(interrupt) {
-  if(multitask) {
-    ASM("       csrr     x3,    sepc            \n"
-        "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
-  } else {
-    ASM("       csrr     x3,    mepc            \n"
-        "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
-  }
+    if (multitask) {
+        ASM("       csrr     x3,    sepc            \n"
+            "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
+    } else {
+        ASM("       csrr     x3,    mepc            \n"
+            "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
+    }
 } else {
-    ASM("       sd       x1,    0(sp)           \n");   // push RA as PC on context switches
+    ASM("           sw       x1,    0(sp)           \n");   // push RA as PC on context switches
 }
-if(multitask) {
-    ASM("       csrr     x3, sstatus            \n");
-} else {
-    ASM("       csrr     x3, mstatus            \n");
-}
+
+    if (multitask)
+    {
+        ASM("       csrr     x3,  sstatus           \n");
+    } else {
+        ASM("       csrr     x3,  mstatus           \n");
+    }
+
     ASM("       sd       x3,    8(sp)           \n"     // push ST
         "       sd       x1,   16(sp)           \n"     // push RA
         "       sd       x5,   24(sp)           \n"     // push x5-x31
@@ -505,17 +511,18 @@ inline void CPU::Context::pop(bool interrupt)
 if(interrupt) {
     ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
 }
-if(multitask) {
-    ASM("       csrw     sepc, x3               \n");   // SEPC = PC
-} else {
-    ASM("       csrw     mepc, x3               \n");   // MEPC = PC
-}
+    if (multitask) {
+        ASM("       csrw     sepc, x3               \n");   // SEPC = PC
+    } else {
+        ASM("       csrw     mepc, x3               \n");   // MEPC = PC
+    }
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
 if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP is automatically cleared on the [m|s]ret in the ISR, so we need to recover it here
     ASM("       li       a0,     %0             \n"     // use a0 as a second TMP (it will be restored later) to adjust [M|S]STATUS.[M|S]PP
         "       or       x3, x3, a0             \n" : : "i"(multitask ? SPP_S : MPP_M));
 }
+
     ASM("       ld       x1,   16(sp)           \n"     // pop RA
         "       ld       x5,   24(sp)           \n"     // pop x5-x31
         "       ld       x6,   32(sp)           \n"
@@ -545,11 +552,13 @@ if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP i
         "       ld      x30,  224(sp)           \n"
         "       ld      x31,  232(sp)           \n"
         "       addi    sp, sp, %0              \n" : : "i"(sizeof(Context))); // complete the pops above by adjusting SP
-if(multitask) {
-    ASM("       csrw    sstatus, x3             \n");   // SSTATUS = ST
-} else {
-    ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
-}
+
+    if (multitask) {
+        ASM("       csrw    sstatus, x3             \n");   // SSTATUS = ST
+    } else {
+        ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
+    }
+
 }
 
 inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }
