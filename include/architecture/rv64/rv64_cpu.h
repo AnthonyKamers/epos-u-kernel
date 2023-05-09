@@ -519,8 +519,16 @@ if(interrupt) {
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
 if(!interrupt) {
-    ASM("       li       a0, 1 << 8            \n"     // use a0 as a second TMP, since it will be restored later
-        "       or       x3, x3, a0             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
+
+    if (multitask) {
+        // bit 18 is SUM: Allow Supervisor User Memory access (in order to make new Thread and not new (SYSTEM) Thread) -> This must be changed for other exercises
+        // bit 8 is SPP: Supervisor Previous Privilege (keeps the supervisor mode)
+        ASM("       li       a0, (1 << 8 | 1 << 18)            \n"     // use a0 as a second TMP, since it will be restored later
+            "       or       x3, x3, a0             \n");
+    } else {
+        ASM("       li       a0, 3 << 11            \n"     // use a0 as a second TMP, since it will be restored later
+            "       or       x3, x3, a0             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
+    }
 }
 
     ASM("       ld       x1,   16(sp)           \n"     // pop RA

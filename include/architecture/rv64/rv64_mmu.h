@@ -273,17 +273,18 @@ public:
         void detach(const Chunk & chunk) {
             unsigned int i = 0;
             unsigned int j = 0;
+            const Page_Table * pt = chunk.pt();
             for(; i < PD_ENTRIES; i++) {
                 Attacher * at = _pd->log()[i];
                 if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
-                            at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        }
+                    bool empty = true;
+                    for(j = 0; j < AT_ENTRIES; j++) {if(unflag(ate2phy((*at)[j])) == unflag(pt)) {
+                            at->log()[j] = 0;
+                            pt++;
+                        } else if (at->log()[j])
+                            empty = false;
                     }
-                    if(ates == AT_ENTRIES)
+                    if(empty)
                         _pd->log()[i] = 0;
                 }
             }
@@ -294,28 +295,23 @@ public:
         }
 
         void detach(const Chunk & chunk, Log_Addr addr) {
-            unsigned int i = pdi(addr);
-            unsigned int j = ati(addr);
-            for(; i < pds(ats(chunk.pts())); i++) {
+            const Page_Table * pt = chunk.pt();
+            for(unsigned int i = pdi(addr); i < pdi(addr) + ats(chunk.pts()); i++) {
                 Attacher * at = _pd->log()[i];
-                if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
-                            at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        } else {
-                            db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ",addr=" << addr << ") failed!" << endl;
-                            return;
-                        }
-                    }
-                    if(ates == AT_ENTRIES)
-                        _pd->log()[i] = 0;
+                bool empty = true;
+                for(unsigned int j = 0; j < AT_ENTRIES; j++) {
+                    if(unflag(ate2phy((*at)[j])) == unflag(pt)) {
+                        at->log()[j] = 0;
+                        pt++;
+                    } else if (at->log()[j])
+                        empty = false;
                 }
+                if(empty)
+                    _pd->log()[i] = 0;
             }
             flush_tlb();
         }
-
+        
         Phy_Addr physical(Log_Addr addr) {
             PD_Entry pde = (*_pd)[pdi(addr)];
             Page_Table * pt = static_cast<Page_Table *>(pde2phy(pde));
