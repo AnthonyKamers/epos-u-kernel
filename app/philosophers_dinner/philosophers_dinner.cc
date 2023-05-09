@@ -1,5 +1,6 @@
 // EPOS Scheduler Test Program
 
+#include <utility/ostream.h>
 #include <time.h>
 #include <synchronizer.h>
 #include <process.h>

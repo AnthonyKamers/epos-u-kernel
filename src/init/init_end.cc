@@ -31,7 +31,7 @@ public:
         // It will return MAIN for CPU0 and IDLE for the others
         Thread * first = Thread::self();
 
-        db<Init, Thread>(INF) << "Dispatching the first thread: " << first << endl;
+        db<Init, Thread>(INF) << "Dispatching the first thread: " << first << endl << endl << endl;
 
         // Interrupts have been disable at Thread::init() and will be reenabled by CPU::Context::load()
         // but we first reset the timer to avoid getting a time interrupt during load()

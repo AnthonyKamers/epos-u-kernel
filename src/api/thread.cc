@@ -221,7 +221,7 @@ void Thread::exit(int status)
 {
     lock();
 
-    db<Thread>(TRC) << "Thread::exit(status=" << status << ") [running=" << running() << "]" << endl;
+    db<Thread>(TRC) << endl << endl << endl << "Thread::exit(status=" << status << ") [running=" << running() << "]" << endl;
 
     Thread * prev = running();
     _scheduler.remove(prev);
