@@ -46,7 +46,7 @@ int main()
    cout << "Extra segment 1 address = " << hex << extra1 << endl;
    cout << "Extra segment 1 value = " << hex << *extra1 << endl;
 
-   cout << "Detaching segments:";
+   cout << "Detaching segments:" << endl;
    self.detach(es1);
    self.detach(es2);
    cout << "  done!" << endl;
@@ -54,7 +54,7 @@ int main()
    for(int i = 0; i < 8; i++)
        cout << "PD[" << i << "] = " << hex << a[i] << endl;
 
-   cout << "Deleting segments:";
+   cout << "Deleting segments:" << endl;
    delete es1;
    delete es2;
    cout << "  done!" << endl;

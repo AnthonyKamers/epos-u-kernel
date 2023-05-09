@@ -89,7 +89,7 @@ __END_SYS
 #include __ARCHITECTURE_TRAITS_H
 #include __MACHINE_TRAITS_H
 
-__BEGIN_SYS
+        __BEGIN_SYS
 
 
 // API Components
@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
 {
     static const unsigned int mode = Traits<Build>::MODE;
     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
+    static const bool multitask = true; //(mode != Traits<Build>::LIBRARY);
     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
 
     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
@@ -128,12 +128,12 @@ template<> struct Traits<Thread>: public Traits<Build>
     static const bool simulate_capacity = false;
     static const unsigned int QUANTUM = 10000; // us
 
-    typedef RR Criterion;
+    typedef FCFS Criterion;
 };
 
 template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
 {
-    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
+static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
 };
 
 template<> struct Traits<Synchronizer>: public Traits<Build>

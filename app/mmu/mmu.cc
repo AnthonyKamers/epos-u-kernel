@@ -1,47 +1,45 @@
 #include <utility/ostream.h>
 #include <architecture/rv64/rv64_mmu.h>
+#include <utility/string.h>
+#include <memory.h>
 
 using namespace EPOS;
 
 OStream cout;
+MMU mmu;
 
-// Architecture Imports
-typedef CPU::Reg Reg;
-typedef CPU::Phy_Addr Phy_Addr;
-typedef CPU::Log_Addr Log_Addr;
-typedef MMU::Page Page;
-typedef MMU::Page_Flags Flags;
-typedef MMU::Page_Table Page_Table;
-typedef MMU::Page_Directory Page_Directory;
-typedef MMU::PT_Entry PT_Entry;
-typedef MMU::PD_Entry PD_Entry;
-typedef MMU::Chunk Chunk;
-typedef MMU::Directory Directory;
+typedef struct {
+    char * name;
+    int age;
+} test_t;
 
 int main()
 {
-    MMU mmu;
+    cout << "Testing MMU" << endl;
 
-    cout << "Memory map test: " << endl;
-    // Aloca o espaço de memória fisica usando as funções desenvolvidas pela MMU
-    Phy_Addr phy_addr = mmu.calloc(1);
-    cout << "Endereço físico alocado: " << phy_addr << endl;
-    // Endereço virtual
-    Log_Addr log_addr = mmu.phy2log(phy_addr);
-    cout << "Endereço virtual da página: " << log_addr << endl;
+    // alloc 1 frame and get its logical address
+    CPU::Phy_Addr physical_address_frame = mmu.calloc(1);
+    CPU::Log_Addr logical_address_frame = mmu.phy2log(physical_address_frame);
+    cout << "Allocated physical address: " << physical_address_frame;
+    cout << " with logical address: " << logical_address_frame << endl;
 
-    // Escreve alguns dados nesse endereço virtual
-    // Array de inteiros
-    int data[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    memcpy(log_addr, data, 10 * sizeof(int));
+    // make example structural data
+    char name[5] = "Epos";
+    test_t test;
+    test.name = name;
+    test.age = 24;
 
-    // Verifica se os dados escritos represetam corretamente aquilo que era esperado
-    int readable_data[sizeof(data) / sizeof(int)];
-    memcpy(readable_data, log_addr, 10 * sizeof(int));
+    // write data to logical address
+    memcpy(logical_address_frame, &test, sizeof(test_t));
 
-    cout << "Dados lidos: " << endl;
-    for (int i = 0; i < 10; i++)
-        cout << readable_data[i] << " ";
-    cout << endl;
+    // verify written data
+    test_t test_copy;
+    memcpy(&test_copy, logical_address_frame, sizeof(test_t));
+
+    if (test.name == test_copy.name && test.age == test_copy.age)
+        cout << "Data written and read correctly!" << endl;
+    else
+        cout << "Test failed: data written and read incorrectly!" << endl;
+
     return 0;
 }

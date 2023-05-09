@@ -33,7 +33,7 @@ template<> struct Traits<Debug>: public Traits<Build>
 {
     static const bool error   = true;
     static const bool warning = true;
-    static const bool info    = false;
+    static const bool info    = true;
     static const bool trace   = false;
 };
 
@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
 {
     static const unsigned int mode = Traits<Build>::MODE;
     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
+    static const bool multitask = true;
     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
 
     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
