@@ -1,0 +1,1302 @@
+diff --git a/app/fork/fork.cc b/app/fork/fork.cc
+new file mode 100644
+index 0000000..9592be4
+--- /dev/null
++++ b/app/fork/fork.cc
+@@ -0,0 +1,43 @@
++#include <utility/ostream.h>
++#include <architecture/rv64/rv64_mmu.h>
++#include <memory.h>
++
++#define BYTES_SEGMENT 10000
++
++using namespace EPOS;
++
++OStream cout;
++MMU mmu;
++
++int main()
++{
++    cout << "MMU: Fork address space test!" << endl;
++
++    // get information from current address space
++    Address_Space current_as(MMU::current());
++
++    // allocate enough for a new address space
++    CPU::Phy_Addr new_as_physical = mmu.alloc(sizeof(current_as));
++    unsigned long * new_as_physical_ptr = new_as_physical;
++    CPU::Log_Addr log_new_as = MMU::phy2log(new_as_physical);
++
++    cout << "Fork physical = " << new_as_physical << endl;
++    cout << "Fork logical = " << log_new_as << endl;
++
++    // make a copy of the current address space
++    memcpy(log_new_as, reinterpret_cast<void *>(MMU::current()), sizeof(current_as));
++    MMU::Page_Directory * new_as = reinterpret_cast<MMU::Page_Directory *>(new_as_physical_ptr);
++    Address_Space forked(new_as);
++
++    // create segment for forked address space
++    Segment * es1 = new (SYSTEM) Segment(BYTES_SEGMENT, Segment::Flags::SYS);
++    cout << "new Segment created with " << BYTES_SEGMENT << "bytes" << endl;
++
++    // attach segment for forked address space
++    CPU::Log_Addr * extra1 = forked.attach(es1);
++    cout << "extra segment in forked address space attached: " << extra1 << endl;
++
++    cout << "Forked correctly!" << endl;
++
++    return 0;
++}
+diff --git a/app/fork/fork_traits.h b/app/fork/fork_traits.h
+new file mode 100644
+index 0000000..d0cfc89
+--- /dev/null
++++ b/app/fork/fork_traits.h
+@@ -0,0 +1,150 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = true;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = false;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = true;
++    static const bool trace   = true;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++__BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
++    static const bool multitask = true;
++    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool simulate_capacity = false;
++    static const unsigned int QUANTUM = 10000; // us
++
++    typedef RR Criterion;
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+diff --git a/app/fork/makefile b/app/fork/makefile
+new file mode 100644
+index 0000000..8a6578a
+--- /dev/null
++++ b/app/fork/makefile
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+diff --git a/app/hello/hello_traits.h b/app/hello/hello_traits.h
+index 9ec7def..d0cfc89 100644
+--- a/app/hello/hello_traits.h
++++ b/app/hello/hello_traits.h
+@@ -33,8 +33,8 @@ template<> struct Traits<Debug>: public Traits<Build>
+ {
+     static const bool error   = true;
+     static const bool warning = true;
+-    static const bool info    = false;
+-    static const bool trace   = false;
++    static const bool info    = true;
++    static const bool trace   = true;
+ };
+ 
+ template<> struct Traits<Lists>: public Traits<Build>
+@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
+ {
+     static const unsigned int mode = Traits<Build>::MODE;
+     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
+-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
++    static const bool multitask = true;
+     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
+ 
+     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
+diff --git a/app/mmu/makefile b/app/mmu/makefile
+new file mode 100644
+index 0000000..916e561
+--- /dev/null
++++ b/app/mmu/makefile
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+\ No newline at end of file
+diff --git a/app/mmu/mmu.cc b/app/mmu/mmu.cc
+new file mode 100644
+index 0000000..6264063
+--- /dev/null
++++ b/app/mmu/mmu.cc
+@@ -0,0 +1,45 @@
++#include <utility/ostream.h>
++#include <architecture/rv64/rv64_mmu.h>
++#include <utility/string.h>
++#include <memory.h>
++
++using namespace EPOS;
++
++OStream cout;
++MMU mmu;
++
++typedef struct {
++    char * name;
++    int age;
++} test_t;
++
++int main()
++{
++    cout << "Testing MMU" << endl;
++
++    // alloc 1 frame and get its logical address
++    CPU::Phy_Addr physical_address_frame = mmu.calloc(1);
++    CPU::Log_Addr logical_address_frame = mmu.phy2log(physical_address_frame);
++    cout << "Allocated physical address: " << physical_address_frame;
++    cout << " with logical address: " << logical_address_frame << endl;
++
++    // make example structural data
++    char name[5] = "Epos";
++    test_t test;
++    test.name = name;
++    test.age = 24;
++
++    // write data to logical address
++    memcpy(logical_address_frame, &test, sizeof(test_t));
++
++    // verify written data
++    test_t test_copy;
++    memcpy(&test_copy, logical_address_frame, sizeof(test_t));
++
++    if (test.name == test_copy.name && test.age == test_copy.age)
++        cout << "Data written and read correctly!" << endl;
++    else
++        cout << "Test failed: data written and read incorrectly!" << endl;
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/app/mmu/mmu_traits.h b/app/mmu/mmu_traits.h
+new file mode 100644
+index 0000000..d0cfc89
+--- /dev/null
++++ b/app/mmu/mmu_traits.h
+@@ -0,0 +1,150 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = true;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = false;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = true;
++    static const bool trace   = true;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++__BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
++    static const bool multitask = true;
++    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool simulate_capacity = false;
++    static const unsigned int QUANTUM = 10000; // us
++
++    typedef RR Criterion;
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+diff --git a/app/philosophers_dinner/philosophers_dinner.cc b/app/philosophers_dinner/philosophers_dinner.cc
+index 5fa4397..8a9368e 100644
+--- a/app/philosophers_dinner/philosophers_dinner.cc
++++ b/app/philosophers_dinner/philosophers_dinner.cc
+@@ -1,5 +1,6 @@
+ // EPOS Scheduler Test Program
+ 
++#include <utility/ostream.h>
+ #include <time.h>
+ #include <synchronizer.h>
+ #include <process.h>
+diff --git a/app/philosophers_dinner/philosophers_dinner_traits.h b/app/philosophers_dinner/philosophers_dinner_traits.h
+index 9ec7def..5bb536f 100644
+--- a/app/philosophers_dinner/philosophers_dinner_traits.h
++++ b/app/philosophers_dinner/philosophers_dinner_traits.h
+@@ -89,7 +89,7 @@ __END_SYS
+ #include __ARCHITECTURE_TRAITS_H
+ #include __MACHINE_TRAITS_H
+ 
+-__BEGIN_SYS
++        __BEGIN_SYS
+ 
+ 
+ // API Components
+@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
+ {
+     static const unsigned int mode = Traits<Build>::MODE;
+     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
+-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
++    static const bool multitask = true; //(mode != Traits<Build>::LIBRARY);
+     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
+ 
+     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
+@@ -123,12 +123,12 @@ template<> struct Traits<Thread>: public Traits<Build>
+     static const bool simulate_capacity = false;
+     static const unsigned int QUANTUM = 10000; // us
+ 
+-    typedef RR Criterion;
++    typedef FCFS Criterion;
+ };
+ 
+ template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
+ {
+-    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
+ };
+ 
+ template<> struct Traits<Synchronizer>: public Traits<Build>
+@@ -147,4 +147,4 @@ template<> struct Traits<Segment>: public Traits<Build> {};
+ 
+ __END_SYS
+ 
+-#endif
++#endif
+\ No newline at end of file
+diff --git a/app/producer_consumer/producer_consumer_traits.h b/app/producer_consumer/producer_consumer_traits.h
+index 188d3ff..197b5b1 100644
+--- a/app/producer_consumer/producer_consumer_traits.h
++++ b/app/producer_consumer/producer_consumer_traits.h
+@@ -33,7 +33,7 @@ template<> struct Traits<Debug>: public Traits<Build>
+ {
+     static const bool error   = true;
+     static const bool warning = true;
+-    static const bool info    = false;
++    static const bool info    = true;
+     static const bool trace   = false;
+ };
+ 
+@@ -104,7 +104,7 @@ template<> struct Traits<System>: public Traits<Build>
+ {
+     static const unsigned int mode = Traits<Build>::MODE;
+     static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
+-    static const bool multitask = (mode != Traits<Build>::LIBRARY);
++    static const bool multitask = true;
+     static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
+ 
+     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
+diff --git a/app/scheduler_test/makefile b/app/scheduler_test/makefile
+new file mode 100644
+index 0000000..916e561
+--- /dev/null
++++ b/app/scheduler_test/makefile
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+\ No newline at end of file
+diff --git a/app/scheduler_test/scheduler_test.cc b/app/scheduler_test/scheduler_test.cc
+new file mode 100644
+index 0000000..140ba39
+--- /dev/null
++++ b/app/scheduler_test/scheduler_test.cc
+@@ -0,0 +1,29 @@
++#include <utility/ostream.h>
++#include <process.h>
++
++using namespace EPOS;
++
++OStream cout;
++
++const int qtd_threads = 3;
++Thread * threads[qtd_threads];
++
++int work_thread(int number) {
++    cout << "Thread " << number << " working" << endl;
++    return 0;
++}
++
++int main()
++{
++    cout << "Test using FCFS scheduler (non preemptive)" << endl;
++
++    for (int i = 0; i < qtd_threads; i++)
++        threads[i] = new Thread(&work_thread, i);
++
++    for (int i = 0; i < qtd_threads; i++) {
++        threads[i]->join();
++        delete threads[i];
++    }
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/app/scheduler_test/scheduler_test_traits.h b/app/scheduler_test/scheduler_test_traits.h
+new file mode 100644
+index 0000000..197b5b1
+--- /dev/null
++++ b/app/scheduler_test/scheduler_test_traits.h
+@@ -0,0 +1,150 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = true;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = false;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = true;
++    static const bool trace   = false;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++__BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
++    static const bool multitask = true;
++    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool simulate_capacity = false;
++    static const unsigned int QUANTUM = 10000; // us
++
++    typedef FCFS Criterion;
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+diff --git a/app/test_segments/makefile b/app/test_segments/makefile
+new file mode 100644
+index 0000000..8a6578a
+--- /dev/null
++++ b/app/test_segments/makefile
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+diff --git a/app/test_segments/test_segments.cc b/app/test_segments/test_segments.cc
+new file mode 100644
+index 0000000..a51a40e
+--- /dev/null
++++ b/app/test_segments/test_segments.cc
+@@ -0,0 +1,65 @@
++// EPOS Segment Test Program
++
++#include <memory.h>
++
++using namespace EPOS;
++
++const unsigned ES1_SIZE = 10000;
++const unsigned ES2_SIZE = 100000;
++
++int main()
++{
++
++//  Funciona
++    OStream cout;
++
++    cout << "Segment and Directory test" << endl;
++
++    cout << "My address space's page directory is located at " << reinterpret_cast<void *>(MMU::current()) << "" << endl;
++    size_t * a = reinterpret_cast<size_t *>(MMU::current());
++
++    for(int i = 0; i < 8; i++)
++    cout << "PD[" << i << "] = " << hex << a[i] << endl;
++    Address_Space self(MMU::current());
++
++    cout << "Creating two extra data segments:" << endl;
++    Segment * es1 = new (SYSTEM) Segment(ES1_SIZE, Segment::Flags::SYS);
++    Segment * es2 = new (SYSTEM) Segment(ES2_SIZE, Segment::Flags::SYS);
++    cout << "  extra segment 1 ("<< es1->pt() << ") => " << ES1_SIZE << " bytes, done!" << endl;
++    cout << "  extra segment 2 ("<< es2->pt() << ") => " << ES2_SIZE << " bytes, done!" << endl;
++
++    cout << "Attaching segments:" << endl;
++    CPU::Log_Addr * extra1 = self.attach(es1);
++    CPU::Log_Addr * extra2 = self.attach(es2);
++    cout << "  extra segment 1 => " << extra1 << " done!" << endl;
++    cout << "  extra segment 2 => " << extra2 << " done!" << endl;
++
++    
++   cout << "Clearing segments:";
++   memset(extra1, 0, ES1_SIZE);
++   memset(extra2, 0, ES2_SIZE);
++   cout << "  done!" << endl;
++
++   cout << "Writing on segment 1:";
++   *extra1 = 0xdeadbeef;
++   cout << "  done!" << endl;
++   cout << "Extra segment 1 address = " << hex << extra1 << endl;
++   cout << "Extra segment 1 value = " << hex << *extra1 << endl;
++
++   cout << "Detaching segments:" << endl;
++   self.detach(es1);
++   self.detach(es2);
++   cout << "  done!" << endl;
++
++   for(int i = 0; i < 8; i++)
++       cout << "PD[" << i << "] = " << hex << a[i] << endl;
++
++   cout << "Deleting segments:" << endl;
++   delete es1;
++   delete es2;
++   cout << "  done!" << endl;
++
++    cout << "I'm done, bye!" << endl;
++
++    return 0;
++}
+diff --git a/app/test_segments/test_segments_traits.h b/app/test_segments/test_segments_traits.h
+new file mode 100644
+index 0000000..d0cfc89
+--- /dev/null
++++ b/app/test_segments/test_segments_traits.h
+@@ -0,0 +1,150 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = LIBRARY;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = true;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = false;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = true;
++    static const bool trace   = true;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++__BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
++    static const bool multitask = true;
++    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool simulate_capacity = false;
++    static const unsigned int QUANTUM = 10000; // us
++
++    typedef RR Criterion;
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+diff --git a/include/architecture/rv64/rv64_cpu.h b/include/architecture/rv64/rv64_cpu.h
+index becf2d1..c02511b 100644
+--- a/include/architecture/rv64/rv64_cpu.h
++++ b/include/architecture/rv64/rv64_cpu.h
+@@ -449,18 +449,30 @@ private:
+     static unsigned int _bus_clock;
+ };
+ 
++
++//Change the CSR based on the current mode
+ inline void CPU::Context::push(bool interrupt)
+ {
+     ASM("       addi     sp, sp, %0             \n" : : "i"(-sizeof(Context))); // adjust SP for the pushes below
+ 
+ if(interrupt) {
+-    ASM("       csrr     x3,    mepc            \n"
+-        "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
++    if (multitask) {
++        ASM("       csrr     x3,    sepc            \n"
++        "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
++    } else {
++        ASM("       csrr     x3,    mepc            \n"
++            "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
++    }
+ } else {
+     ASM("       sw       x1,    0(sp)           \n");   // push RA as PC on context switches
+ }
+ 
+-    ASM("       csrr     x3,  mstatus           \n");
++    if (multitask)
++    {
++        ASM("       csrr     x3,  sstatus           \n");
++    } else {
++        ASM("       csrr     x3,  mstatus           \n");
++    }
+ 
+     ASM("       sd       x3,    8(sp)           \n"     // push ST
+         "       sd       x1,   16(sp)           \n"     // push RA
+@@ -499,12 +511,24 @@ inline void CPU::Context::pop(bool interrupt)
+ if(interrupt) {
+     ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
+ }
+-    ASM("       csrw     mepc, x3               \n");   // MEPC = PC
++    if (multitask) {
++        ASM("       csrw     sepc, x3               \n");   // SEPC = PC
++    } else {
++        ASM("       csrw     mepc, x3               \n");   // MEPC = PC
++    }
+ 
+     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
+ if(!interrupt) {
+-    ASM("       li       a0, 3 << 11            \n"     // use a0 as a second TMP, since it will be restored later
+-        "       or       x3, x3, a0             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
++
++    if (multitask) {
++        // bit 18 is SUM: Allow Supervisor User Memory access (in order to make new Thread and not new (SYSTEM) Thread) -> This must be changed for other exercises
++        // bit 8 is SPP: Supervisor Previous Privilege (keeps the supervisor mode)
++        ASM("       li       a0, (1 << 8 | 1 << 18)            \n"     // use a0 as a second TMP, since it will be restored later
++            "       or       x3, x3, a0             \n");
++    } else {
++        ASM("       li       a0, 3 << 11            \n"     // use a0 as a second TMP, since it will be restored later
++            "       or       x3, x3, a0             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
++    }
+ }
+ 
+     ASM("       ld       x1,   16(sp)           \n"     // pop RA
+@@ -537,7 +561,12 @@ if(!interrupt) {
+         "       ld      x31,  232(sp)           \n"
+         "       addi    sp, sp, %0              \n" : : "i"(sizeof(Context))); // complete the pops above by adjusting SP
+ 
+-    ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
++    if (multitask) {
++        ASM("       csrw    sstatus, x3             \n");   // SSTATUS = ST
++    } else {
++        ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
++    }
++    
+ }
+ 
+ inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }
+diff --git a/include/machine/riscv/sifive_u/sifive_u_traits.h b/include/machine/riscv/sifive_u/sifive_u_traits.h
+index d0b5187..d784f07 100644
+--- a/include/machine/riscv/sifive_u/sifive_u_traits.h
++++ b/include/machine/riscv/sifive_u/sifive_u_traits.h
+@@ -34,18 +34,18 @@ public:
+ 
+     // Physical Memory at Boot
+     static const unsigned int BOOT              = NOT_USED;
+-    static const unsigned int SETUP             = library ? NOT_USED : RAM_BASE;        // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
++    static const unsigned int SETUP             = RAM_BASE;        // library ? NOT_USED : RAM_BASE; RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
+     static const unsigned int IMAGE             = 0x80100000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
+ 
+     // Logical Memory
+-    static const unsigned int APP_LOW           = library ? RAM_BASE : 0x80400000;      // 2 GB + 4 MB
++    static const unsigned int APP_LOW           = 0x80400000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
+     static const unsigned int APP_HIGH          = 0xff7fffff;                           // SYS - 1
+ 
+     static const unsigned int APP_CODE          = APP_LOW;
+     static const unsigned int APP_DATA          = APP_CODE + 4 * 1024 * 1024;
+ 
+-    static const unsigned int INIT              = library ? NOT_USED : 0x80080000;      // RAM_BASE + 512 KB (will be part of the free memory at INIT)
+-    static const unsigned int PHY_MEM           = library ? RAM_BASE : 0x20000000;      // 512 MB (max 1536 MB of RAM)
++    static const unsigned int INIT              = 0x80080000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
++    static const unsigned int PHY_MEM           = 0x20000000;      // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
+     static const unsigned int IO                = 0x00000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
+     static const unsigned int SYS               = 0xff800000;                           // 4 GB - 8 MB
+ 
+@@ -71,6 +71,7 @@ template <> struct Traits<Timer>: public Traits<Machine_Common>
+     // choice must respect the scheduler time-slice, i. e., it must be higher
+     // than the scheduler invocation frequency.
+     static const int FREQUENCY = 1000; // Hz
++    static const bool enabled = false;
+ };
+ 
+ template <> struct Traits<UART>: public Traits<Machine_Common>
+diff --git a/makedefs b/makedefs
+index b1506ad..0d797fa 100644
+--- a/makedefs
++++ b/makedefs
+@@ -81,7 +81,7 @@ LSYS		= $(LSYSNAME)_$(MMOD)
+ LINIT		= $(LINITNAME)_$(MMOD)
+ LUTIL		= $(LUTILNAME)_$(MMOD)
+ ifeq ($(SMOD), library)
+-BOOT_ROM	= 
++BOOT_ROM	= -device loader,file=$(APPLICATION).img,addr=$(IMAGE_ADDR),force-raw=on 
+ else
+ BOOT_ROM	= -device loader,file=$(APPLICATION).img,addr=$(IMAGE_ADDR),force-raw=on 
+ endif
+diff --git a/src/api/thread.cc b/src/api/thread.cc
+index ad578b4..046d1c8 100644
+--- a/src/api/thread.cc
++++ b/src/api/thread.cc
+@@ -221,7 +221,7 @@ void Thread::exit(int status)
+ {
+     lock();
+ 
+-    db<Thread>(TRC) << "Thread::exit(status=" << status << ") [running=" << running() << "]" << endl;
++    db<Thread>(TRC) << endl << endl << endl << "Thread::exit(status=" << status << ") [running=" << running() << "]" << endl;
+ 
+     Thread * prev = running();
+     _scheduler.remove(prev);
+diff --git a/src/architecture/rv64/rv64_cpu.cc b/src/architecture/rv64/rv64_cpu.cc
+index bcdbe1b..c09c51a 100644
+--- a/src/architecture/rv64/rv64_cpu.cc
++++ b/src/architecture/rv64/rv64_cpu.cc
+@@ -10,7 +10,41 @@ unsigned int CPU::_bus_clock;
+ 
+ void CPU::Context::save() volatile
+ {
+-    ASM("       sd       x1,    0(a0)           \n"     // push RA as PC
++    if (multitask) {
++        ASM("       sd       x1,    0(a0)           \n"     // push RA as PC
++        "       csrr     x3,  sstatus           \n"
++        "       sd       x3,    8(sp)           \n"     // push ST
++        "       sd       x1,   16(sp)           \n"     // push RA
++        "       sd       x5,   24(sp)           \n"     // push x5-x31
++        "       sd       x6,   32(sp)           \n"
++        "       sd       x7,   40(sp)           \n"
++        "       sd       x8,   48(sp)           \n"
++        "       sd       x9,   56(sp)           \n"
++        "       sd      x10,   64(sp)           \n"
++        "       sd      x11,   72(sp)           \n"
++        "       sd      x12,   80(sp)           \n"
++        "       sd      x13,   88(sp)           \n"
++        "       sd      x14,   96(sp)           \n"
++        "       sd      x15,  104(sp)           \n"
++        "       sd      x16,  112(sp)           \n"
++        "       sd      x17,  120(sp)           \n"
++        "       sd      x18,  128(sp)           \n"
++        "       sd      x19,  136(sp)           \n"
++        "       sd      x20,  144(sp)           \n"
++        "       sd      x21,  152(sp)           \n"
++        "       sd      x22,  160(sp)           \n"
++        "       sd      x23,  168(sp)           \n"
++        "       sd      x24,  176(sp)           \n"
++        "       sd      x25,  184(sp)           \n"
++        "       sd      x26,  192(sp)           \n"
++        "       sd      x27,  200(sp)           \n"
++        "       sd      x28,  208(sp)           \n"
++        "       sd      x29,  216(sp)           \n"
++        "       sd      x30,  224(sp)           \n"
++        "       sd      x31,  232(sp)           \n"
++        "       ret                             \n");
++    } else {
++        ASM("       sd       x1,    0(a0)           \n"     // push RA as PC
+         "       csrr     x3,  mstatus           \n"
+         "       sd       x3,    8(sp)           \n"     // push ST
+         "       sd       x1,   16(sp)           \n"     // push RA
+@@ -42,6 +76,7 @@ void CPU::Context::save() volatile
+         "       sd      x30,  224(sp)           \n"
+         "       sd      x31,  232(sp)           \n"
+         "       ret                             \n");
++    }
+ }
+ 
+ // Context load does not verify if interrupts were previously enabled by the Context's constructor
+diff --git a/src/init/init_end.cc b/src/init/init_end.cc
+index f425a89..408b614 100644
+--- a/src/init/init_end.cc
++++ b/src/init/init_end.cc
+@@ -31,7 +31,7 @@ public:
+         // It will return MAIN for CPU0 and IDLE for the others
+         Thread * first = Thread::self();
+ 
+-        db<Init, Thread>(INF) << "Dispatching the first thread: " << first << endl;
++        db<Init, Thread>(INF) << "Dispatching the first thread: " << first << endl << endl << endl;
+ 
+         // Interrupts have been disable at Thread::init() and will be reenabled by CPU::Context::load()
+         // but we first reset the timer to avoid getting a time interrupt during load()
+diff --git a/src/setup/setup_sifive_u.cc b/src/setup/setup_sifive_u.cc
+index a90836b..104fb96 100644
+--- a/src/setup/setup_sifive_u.cc
++++ b/src/setup/setup_sifive_u.cc
+@@ -140,7 +140,7 @@ Setup::Setup()
+         setup_sys_pd();
+ 
+         // Relocate the machine to supervisor interrupt forwarder
+-        setup_m2s();
++        //setup_m2s();
+ 
+         // Enable paging
+         enable_paging();
+@@ -193,11 +193,11 @@ void Setup::build_lm()
+     db<Setup>(TRC) << "Setup::build_lm()" << endl;
+ 
+     // Get boot image structure
+-    si->lm.has_stp = (si->bm.setup_offset != -1u);
+-    si->lm.has_ini = (si->bm.init_offset != -1u);
+-    si->lm.has_sys = (si->bm.system_offset != -1u);
+-    si->lm.has_app = (si->bm.application_offset != -1u);
+-    si->lm.has_ext = (si->bm.extras_offset != -1u);
++    si->lm.has_stp = (si->bm.setup_offset != -1ul);
++    si->lm.has_ini = (si->bm.init_offset != -1ul);
++    si->lm.has_sys = (si->bm.system_offset != -1ul);
++    si->lm.has_app = (si->bm.application_offset != -1ul);
++    si->lm.has_ext = (si->bm.extras_offset != -1ul);
+ 
+     // Check SETUP integrity and get the size of its segments
+     if(si->lm.has_stp) {
+@@ -441,7 +441,7 @@ void Setup::setup_app_pt()
+     // APPLICATION code
+     // Since load_parts() will load the code into memory, the code segment can't be marked R/O yet
+     // The correct flags (APPC and APPD) will be configured after the execution of load_parts(), by adjust_perms()
+-    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APP);
++    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::SYS);
+ 
+     // APPLICATION data (contains stack, heap and extra)
+     app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APP);
+@@ -729,7 +729,7 @@ void _entry() // machine mode
+         CPU::halt();
+ 
+     CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
+-    CPU::mies(CPU::MSI | CPU::MTI | CPU::MEI);          // enable interrupts generation by CLINT at machine level
++    CPU::mies(CPU::MSI | CPU::MEI);                     // enable interrupts generation by CLINT at machine level
+ 
+     CPU::tp(CPU::mhartid());                            // tp will be CPU::id() for supervisor mode
+     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP
+@@ -737,7 +737,7 @@ void _entry() // machine mode
+     Machine::clear_bss();
+ 
+     if(Traits<System>::multitask) {
+-        CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
++        //CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
+         CPU::mideleg(0xffff);                           // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
+         CPU::medeleg(0xffff);                           // delegate all exceptions to supervisor mode
+         CPU::mstatuss(CPU::MPP_S);                      // prepare jump into supervisor mode at mret
+@@ -746,7 +746,7 @@ void _entry() // machine mode
+         CPU::mstatus(CPU::MPP_M);                       // stay in machine mode at mret
+     }
+ 
+-    CPU::pmpcfg0(0b11111); 				// configure PMP region 0 as (L=unlocked [0], [00], A = NAPOT [11], X [1], W [1], R [1])
++    CPU::pmpcfg0(0b11111); 				               // configure PMP region 0 as (L=unlocked [0], [00], A = NAPOT [11], X [1], W [1], R [1])
+     CPU::pmpaddr0((1ULL << MMU::LA_BITS) - 1);          // comprising the whole memory space
+ 
+     CPU::mepc(CPU::Reg(&_setup));                       // entry = _setup

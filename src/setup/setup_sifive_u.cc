@@ -140,7 +140,7 @@ Setup::Setup()
         setup_sys_pd();
 
         // Relocate the machine to supervisor interrupt forwarder
-        //setup_m2s();
+        setup_m2s();
 
         // Enable paging
         enable_paging();
@@ -728,8 +728,8 @@ void _entry() // machine mode
     if(CPU::mhartid() == 0)                             // SiFive-U always has 2 cores, but core 0 does not feature an MMU, so we halt it and let core 1 run in a single-core configuration
         CPU::halt();
 
-    CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
-    CPU::mies(CPU::MSI | CPU::MEI);                     // enable interrupts generation by CLINT at machine level
+//    CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
+    CPU::mint_disable();                                // disable machine interrupts (they will be reenabled at Init_End)
 
     CPU::tp(CPU::mhartid());                            // tp will be CPU::id() for supervisor mode
     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP
@@ -737,10 +737,22 @@ void _entry() // machine mode
     Machine::clear_bss();
 
     if(Traits<System>::multitask) {
-        //CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
-        CPU::mideleg(0xffff);                           // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
+//        // Relocate _mmode_forward - 1024 bytes are enough
+//        char *src = reinterpret_cast<char *>(&_int_m2s);
+//        char *dst = reinterpret_cast<char *>(Memory_Map::INT_M2S);
+//        for (long unsigned int i = 0; i < sizeof(MMU::Page); i++)
+//        {
+//            *dst = *src;
+//            src++;
+//            dst++;
+//        }
+        CPU::mies(CPU::MSI | CPU::MEI | CPU::MTI);                     // enable interrupts generation by CLINT at machine level
+        CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
+
+
+        CPU::mideleg(CPU::SSI | CPU::STI | CPU::SEI);                           // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
         CPU::medeleg(0xffff);                           // delegate all exceptions to supervisor mode
-        CPU::mstatuss(CPU::MPP_S);                      // prepare jump into supervisor mode at mret
+        CPU::mstatuss(CPU::MPP_S | CPU::MPIE);                      // prepare jump into supervisor mode at mret
         CPU::sstatuss(CPU::SUM);                        // allows User Memory access in supervisor mode
     } else {
         CPU::mstatus(CPU::MPP_M);                       // stay in machine mode at mret
@@ -765,47 +777,56 @@ void _setup() // supervisor mode
 // Therefore, an interrupt forwarder must be installed. We use RAM_TOP for this, with the code at the beginning of the last page and a stack at the end of the same page.
 void _int_m2s()
 {
+    db<Setup>(INF) << "Machine interrupt!" << endl;
+
     // Save context
-    ASM("        csrw  mscratch,     sp                                 \n");
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("        la          sp,     %0                                 \n"
-        "        sw          a2,   0(sp)                                \n"
-        "        sw          a3,   4(sp)                                \n"
-        "        sw          a4,   8(sp)                                \n"
-        "        sw          a5,  12(sp)                                \n" : : "i"(Memory_Map::BOOT_STACK - 16));
-} else {
-    ASM("        lui         sp,     %0                                 \n"
-        "        addi        sp, sp, %1                                 \n"
-        "        sd          a2,   0(sp)                                \n"
-        "        sd          a3,   8(sp)                                \n"
-        "        sd          a4,  16(sp)                                \n"
-        "        sd          a5,  24(sp)                                \n" : : "i"((Memory_Map::BOOT_STACK - 32) >> 12), "i"((Memory_Map::BOOT_STACK - 32) && 0xfff));
-}
+//    ASM("        csrw  mscratch,     sp                                 \n");
+//    if(Traits<CPU>::WORD_SIZE == 32) {
+//        ASM("        la          sp,     %0                                 \n"
+//            "        sw          a2,   0(sp)                                \n"
+//            "        sw          a3,   4(sp)                                \n"
+//            "        sw          a4,   8(sp)                                \n"
+//            "        sw          a5,  12(sp)                                \n" : : "i"(Memory_Map::BOOT_STACK - 16));
+//    } else {
+//        ASM("        lui         sp,     %0                                 \n"
+//            "        addi        sp, sp, %1                                 \n"
+//            "        sd          a2,   0(sp)                                \n"
+//            "        sd          a3,   8(sp)                                \n"
+//            "        sd          a4,  16(sp)                                \n"
+//            "        sd          a5,  24(sp)                                \n" : : "i"((Memory_Map::BOOT_STACK - 32) >> 12), "i"((Memory_Map::BOOT_STACK - 32) && 0xfff));
+//    }
 
     CPU::Reg id = CPU::mcause();
 
     if((id & CLINT::INT_MASK) == CLINT::IRQ_MAC_TIMER) {
         // MIP.MTI is a direct logic on (MTIME == MTIMECMP) and reseting the Timer (i.e. adjusting MTIMECMP) seems to be the only way to clear it
         Timer::reset();
-        CPU::sies(CPU::STI);
+//        CPU::sies(CPU::STI);
     }
 
+    CPU::miec(CPU::MTI); // clear MTI in MIP
     CPU::Reg i = 1 << ((id & CLINT::INT_MASK) - 2);
-    if(CPU::int_enabled() && (CPU::sie() & i))
-        CPU::mips(i); // forward to supervisor mode
+
+    // forward to supervisor mode
+    if(CPU::int_enabled() && (CPU::sie() & i)) {
+        CPU::mips(i);
+    }
+
 
     // Restore context
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("        lw          a2,   0(sp)                                \n"
-        "        lw          a3,   4(sp)                                \n"
-        "        lw          a4,   8(sp)                                \n"
-        "        lw          a5,  12(sp)                                \n");
-} else {
-    ASM("        ld          a2,   0(sp)                                \n"
-        "        ld          a3,   8(sp)                                \n"
-        "        ld          a4,  16(sp)                                \n"
-        "        ld          a5,  24(sp)                                \n");
-}
-    ASM("        csrr        sp, mscratch                               \n"
-        "        mret                                                   \n");
+//    if(Traits<CPU>::WORD_SIZE == 32) {
+//        ASM("        lw          a2,   0(sp)                                \n"
+//            "        lw          a3,   4(sp)                                \n"
+//            "        lw          a4,   8(sp)                                \n"
+//            "        lw          a5,  12(sp)                                \n");
+//    } else {
+//        ASM("        ld          a2,   0(sp)                                \n"
+//            "        ld          a3,   8(sp)                                \n"
+//            "        ld          a4,  16(sp)                                \n"
+//            "        ld          a5,  24(sp)                                \n");
+//    }
+//        ASM("        csrr        sp, mscratch                               \n"
+//            "        mret                                                   \n");
+    CPU::mstatuss(CPU::MPP_S); // stay in supervisor mode at mret
+    ASM("mret");
 }

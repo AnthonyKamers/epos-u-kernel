@@ -387,6 +387,7 @@ public:
     static Reg mcause() { Reg r; ASM("csrr %0, mcause" : "=r"(r) : : ); return r; }
     static Reg mtval()  { Reg r; ASM("csrr %0, mtval" :  "=r"(r) : : ); return r; }
 
+    static void mepc(Log_Addr addr)   { ASM("csrw mepc, %0" : : "r"(Reg64(addr)) : "cc"); }
     static void mepc(Reg r)   { ASM("csrw mepc, %0" : : "r"(r) : "cc"); }
     static Reg  mepc() { Reg r; ASM("csrr %0, mepc" :  "=r"(r) : : ); return r; }
 

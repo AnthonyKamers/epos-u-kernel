@@ -14,7 +14,7 @@ void Timer::init()
 
     IC::int_vector(IC::INT_SYS_TIMER, int_handler);
 
-    reset();
+//    reset();
     IC::enable(IC::INT_SYS_TIMER);
 }
 
