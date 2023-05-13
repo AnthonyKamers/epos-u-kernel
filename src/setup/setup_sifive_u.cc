@@ -557,6 +557,11 @@ void Setup::enable_paging()
         db<Setup>(INF) << "Setup::sp=" << CPU::sp() << endl;
     }
 
+    // print the number of pages and page tables
+    unsigned long pages = MMU::pages(APP_HIGH - APP_LOW);
+    unsigned total_pts = MMU::pts(pages);
+    db<Setup>(INF) << "pages = " << pages << " | total pages = " << total_pts << endl;
+
     // Set SATP and enable paging
     MMU::pd(multitask ? si->pmm.sys_pd : FLAT_MEM_MAP);
 
