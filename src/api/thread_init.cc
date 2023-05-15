@@ -33,6 +33,15 @@ void Thread::init()
 
     Main * main = reinterpret_cast<Main *>(si->lm.app_entry);
 
+    //Segment * cs = new ((void*)Memory_Map::APP_CODE) Segment(64 * 1024, MMU::Page_Flags::APPC);
+    //Segment * ds = new ((void*)Memory_Map::APP_DATA) Segment(64 * 1024, MMU::Page_Flags::APPD);
+    //Task * app_task =  new (SYSTEM) Task(new (SYSTEM) Address_Space, cs, ds, );
+
+    //Novo AS? Ou já criou?
+    //db<Setup>(TRC) << "app_task = " << hex << app_task << endl;
+    //Task::activate(app_task);
+
+
 #endif
 
     // Idle thread creation does not cause rescheduling (see Thread::constructor_epilogue)
