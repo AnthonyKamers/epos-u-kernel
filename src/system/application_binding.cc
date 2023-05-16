@@ -4,6 +4,7 @@
 #include <utility/ostream.h>
 #include <architecture/cpu.h>
 #include <system.h>
+#include <framework/main.h>
 
 // Global objects
 __BEGIN_SYS
@@ -19,7 +20,7 @@ extern "C" {
 
 __USING_SYS;
 extern "C" {
-    void _syscall(void * m) { CPU::syscall(m); }
+    // void _syscall(void * m) { CPU::syscall(m); }
     void _print(const char * s);
     void _print_preamble() {}
     void _print_trailler(bool error) { if(error) _exit(-1); }

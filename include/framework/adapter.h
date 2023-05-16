@@ -9,6 +9,7 @@
 #define __adapter_h
 
 #include "scenario.h"
+#include "id.h"
 
 __BEGIN_SYS
 
