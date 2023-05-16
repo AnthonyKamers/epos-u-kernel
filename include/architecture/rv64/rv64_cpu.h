@@ -235,6 +235,9 @@ public:
 
     static void switch_context(Context ** o, Context * n) __attribute__ ((naked));
 
+    static int syscall(void * message);
+    static void syscalled();
+
     template<typename T>
     static T tsl(volatile T & lock) {
         register T old;

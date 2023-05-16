@@ -260,9 +260,12 @@ public:
         }
 
         Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
-            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags()))
+            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
+                db<Setup>(WRN) << "NOT ATTACHABLE!" << endl;
                 return false;
+            }
             attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
+            db<Setup>(WRN) << "ATTACHED!" << endl;
             return addr;
         }
 

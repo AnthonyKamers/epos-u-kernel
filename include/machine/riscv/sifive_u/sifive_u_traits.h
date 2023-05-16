@@ -28,7 +28,7 @@ public:
 
     // Physical Memory
     static const unsigned long RAM_BASE          = 0x0000000080000000;                           // 2 GB
-    static const unsigned long RAM_TOP           = 0x0000000087ffffff;                           // 2 GB + 128 MB (max 1536 MB of RAM => RAM + MIO < 2 G)
+    static const unsigned long RAM_TOP           = 0x000000027fffffff;                           // 2 GB + 128 MB (max 1536 MB of RAM => RAM + MIO < 2 G)
     static const unsigned long MIO_BASE          = 0x0000000000000000;
     static const unsigned long MIO_TOP           = 0x000000001fffffff;                           // 512 MB (max 512 MB of MIO => RAM + MIO < 2 G)
 
@@ -38,12 +38,12 @@ public:
     static const unsigned long IMAGE             = 0x0000000080100000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
 
     // Logical Memory
-    static const unsigned long INIT              = 0x0000000080080000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
+    static const unsigned long INIT              = 0xffffffff80000000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
     static const unsigned long PHY_MEM           = 0x0000000020000000;      // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
     static const unsigned long IO                = 0x0000000000000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
     static const unsigned long SYS               = 0xFFFFFFFF80200000;                           // 4 GB - 8 MB
 
-    static const unsigned long APP_LOW           = 0x0000000080400000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
+    static const unsigned long APP_LOW           = 0x0000000080000000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
     static const unsigned long APP_HIGH          = SYS - 1;
 
     static const unsigned long APP_CODE          = APP_LOW;
