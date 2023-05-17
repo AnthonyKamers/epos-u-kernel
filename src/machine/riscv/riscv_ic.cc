@@ -65,9 +65,9 @@ void IC::exception(Interrupt_Id id)
     CPU::Reg status = CPU::status();
     CPU::Reg cause = CPU::cause();
     CPU::Reg tval = CPU::tval();
-    Thread * thread = Thread::self();
+//    Thread * thread = Thread::self();
 
-    db<IC,System>(WRN) << "IC::Exception(" << id << ") => {" << hex << "thread=" << thread << ",epc=" << epc << ",sp=" << sp << ",status=" << status << ",cause=" << cause << ",tval=" << tval << "}" << dec;
+    db<IC,System>(WRN) << "IC::Exception(" << id << ") => {" << hex << ",epc=" << epc << ",sp=" << sp << ",status=" << status << ",cause=" << cause << ",tval=" << tval << "}" << dec;
 
     switch(id) {
     case CPU::EXC_IALIGN: // instruction address misaligned

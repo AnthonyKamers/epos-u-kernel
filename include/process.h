@@ -104,7 +104,10 @@ protected:
     Criterion & criterion() { return const_cast<Criterion &>(_link.rank()); }
     Queue::Element * link() { return &_link; }
 
-    static Thread * volatile running() { return _scheduler.chosen(); }
+    static Thread * volatile running() {
+        db<Thread>(INF) << "Thread::running() => Schedulables: " << _scheduler.schedulables() << " | chosen: " << _scheduler.chosen() << endl;
+        return _scheduler.chosen();
+    }
 
     static void lock() { CPU::int_disable(); }
     static void unlock() { CPU::int_enable(); }
@@ -160,6 +163,10 @@ protected:
     Task(Address_Space * as, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
     : _as(as), _cs(cs), _ds(ds), _code(code), _data(data), _entry(entry) {
         db<Task, Init>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",code=" << _code << ",data=" << _data << ",entry=" << _entry << ") => " << this << endl;
+
+        _current = this;
+        activate();
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::RUNNING, Thread::MAIN, this, 0), entry, an ...);
     }
 
 public:
@@ -197,7 +204,10 @@ public:
     static Task * volatile self() { return current(); }
 
 private:
-    void activate() const { _current = const_cast<Task *>(this); _as->activate(); }
+    void activate() const {
+//        _current = const_cast<Task *>(this);
+        _as->activate();
+    }
 
     void insert(Thread * t) { _threads.insert(new (SYSTEM) Queue::Element(t)); }
     void remove(Thread * t) { Queue::Element * el = _threads.remove(t); if(el) delete el; }

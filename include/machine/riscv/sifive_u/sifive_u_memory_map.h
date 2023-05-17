@@ -26,7 +26,7 @@ public:
         LAST_PAGE       = RAM_TOP + 1 - 4096,
         INT_M2S         = LAST_PAGE,   		// with multitasking, the last page is used by the _int_m2s() machine mode interrupt forwarder installed by SETUP before going into supervisor mode; code and stack share the same page, with code at the bottom and the stack at the top
         FLAT_MEM_MAP    = LAST_PAGE,       	// in LIBRARY mode, the last page is used for a single-level mapping of the whole memory space
-        BOOT_STACK      = LAST_PAGE - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
+        BOOT_STACK      = 0x800fffff,       // LAST_PAGE - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
 
         FREE_BASE       = RAM_BASE,
         FREE_TOP        = BOOT_STACK,
@@ -66,14 +66,14 @@ public:
         IO              = Traits<Machine>::IO,
 
         SYS             = Traits<Machine>::SYS,
-        SYS_CODE        = multitask ? SYS + 0x0000000000000000 : NOT_USED,
-        SYS_INFO        = multitask ? SYS + 0x0000000000100000 : NOT_USED,
-        SYS_PT          = multitask ? SYS + 0x0000000000101000 : NOT_USED,
-        SYS_PD          = multitask ? SYS + 0x0000000000102000 : NOT_USED,
-        SYS_DATA        = multitask ? SYS + 0x0000000000103000 : NOT_USED,
-        SYS_STACK       = multitask ? SYS + 0x0000000000200000 : NOT_USED,
-        SYS_HEAP        = multitask ? SYS + 0x0000000000400000 : NOT_USED,
-        SYS_HIGH        = multitask ? SYS + 0x00000000007fffff : NOT_USED
+        SYS_CODE        = multitask ? SYS + 0x00000000 : NOT_USED,
+        SYS_INFO        = multitask ? SYS + 0x00100000 : NOT_USED,
+        SYS_PT          = multitask ? SYS + 0x00101000 : NOT_USED,
+        SYS_PD          = multitask ? SYS + 0x00102000 : NOT_USED,
+        SYS_DATA        = multitask ? SYS + 0x00103000 : NOT_USED,
+        SYS_STACK       = multitask ? SYS + 0x00200000 : NOT_USED,
+        SYS_HEAP        = multitask ? SYS + 0x00400000 : NOT_USED,
+        SYS_HIGH        = multitask ? SYS_HEAP + Traits<Machine>::HEAP_SIZE + 1 : NOT_USED
     };
 };
 
