@@ -479,7 +479,7 @@ void Setup::setup_sys_pd()
                    << "})" << endl;
 
     // Check alignments
-    assert(MMU::pdi(SETUP) == MMU::pdi(RAM_BASE));
+    assert(MMU::pdi(SETUP) <= MMU::pdi(APP_LOW));
     assert(MMU::pdi(INT_M2S) == MMU::pdi(RAM_TOP));
     if(RAM_BASE != MMU::align_segment(RAM_BASE))
         db<Setup>(WRN) << "Setup::setup_sys_pd: unaligned physical memory!" << endl;
@@ -506,9 +506,9 @@ void Setup::setup_sys_pd()
         Chunk base(&mem_pt[MMU::ati(RAM_BASE)], MMU::pti(RAM_BASE, APP_LOW), MMU::pti(RAM_BASE, APP_LOW) + MMU::pages(APP_LOW - RAM_BASE), Flags::SYS);
         Chunk top(&mem_pt[MMU::ati(RAM_TOP)], 0, MMU::PT_ENTRIES, Flags::SYS);
         if(dir.attach(base, RAM_BASE) != RAM_BASE)
-            db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach SETUP+INIT physical memory at " << reinterpret_cast<void *>(RAM_BASE) << "!" << endl;
+            db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach SETUP physical memory at " << reinterpret_cast<void *>(RAM_BASE) << "!" << endl;
         if(dir.attach(top, MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page)) != MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page))
-            db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach SETUP+INIT physical memory at " << static_cast<void *>(MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page)) << "!" << endl;
+            db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach SETUP physical memory at " << static_cast<void *>(MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page)) << "!" << endl;
     }
 
     // Map I/O address space into the page tables pointed by io_pt
@@ -729,7 +729,7 @@ void _entry() // machine mode
         CPU::halt();
 
     CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
-    CPU::mies(CPU::MSI | CPU::MEI);                     // enable interrupts generation by CLINT at machine level
+    CPU::mie(CPU::MSI | CPU::MEI);                     // enable interrupts generation by CLINT at machine level
 
     CPU::tp(CPU::mhartid());                            // tp will be CPU::id() for supervisor mode
     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP

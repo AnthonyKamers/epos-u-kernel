@@ -25,8 +25,6 @@ private:
     static const unsigned long APP_LOW = Memory_Map::APP_LOW;
     static const unsigned long APP_HIGH = Memory_Map::APP_HIGH;
     static const unsigned long PHY_MEM = Memory_Map::PHY_MEM;
-    static const unsigned long SYS = Memory_Map::SYS;
-    static const unsigned long IO = Memory_Map::IO;
 
 public:
     // Page Flags
@@ -238,11 +236,10 @@ public:
     {
     public:
         Directory(): _free(true), _pd(calloc(1, WHITE)) {
-            for(unsigned int i = pdi(IO); i < pdi(APP_LOW); i++)
-                (*_pd)[i] = (*_master)[i];
-            
-            for(unsigned int i = pdi(SYS); i < PD_ENTRIES; i++)
-                (*_pd)[i] = (*_master)[i];
+            for(unsigned int i = 0; i < PD_ENTRIES; i++)
+                if(!((i >= pdi(APP_LOW)) && (i <= pdi(APP_HIGH))))
+                    _pd->log()[i] = _master->log()[i];
+
         }
 
         Directory(Page_Directory * pd): _free(false), _pd(pd) {}
