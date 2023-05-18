@@ -155,12 +155,17 @@ private:
     typedef CPU::Phy_Addr Phy_Addr;
     typedef CPU::Context Context;
     typedef Thread::Queue Queue;
+    typedef MMU::Flags Flags;
 
 protected:
     // This constructor is only used by Thread::init()
     template<typename ... Tn>
     Task(Address_Space * as, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
-    : _as(as), _cs(cs), _ds(ds), _code(code), _data(data), _entry(entry) {
+    : _as(as), _cs(cs), _ds(ds),
+      _code(_as->attach(_cs, code)),
+      _data(_as->attach(_ds, data)),
+      _entry(entry)
+    {
         db<Task, Init>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",code=" << _code << ",data=" << _data << ",entry=" << _entry << ") => " << this << endl;
 
         _current = this;
@@ -173,16 +178,41 @@ public:
     Task(Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
         db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
+
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), entry, an ...);
     }
     
     template<typename ... Tn>
     Task(const Thread::Configuration & conf, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
         db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
+
+        _main = new (SYSTEM) Thread(conf, entry, an ...);
     }
-    
+
+    // fork-like constructor
     template<typename ... Tn>
-    Task(Task * task = _current, int (* entry)(Tn ...) = 0, Tn ... an) { // fork-like constructor
+    Task(Task * task = _current, int (* entry)(Tn ...) = 0, Tn ... an) {
+        // make new address space and copy the current process to the new one's
+        _as = new (SYSTEM) Address_Space();
+        auto size_current_as = sizeof(*task->address_space());
+        memcpy(_as, task->address_space(), size_current_as);
+
+        // create segments for forked address
+        _cs = new (SYSTEM) Segment(task->code_segment()->size(), Segment::Flags::SYS);
+        _ds = new (SYSTEM) Segment(task->data_segment()->size(), Segment::Flags::SYS);
+
+        // copy content from the current segments to the new ones
+        memcpy(_cs, task->code_segment(), task->code_segment()->size());
+        memcpy(_ds, task->data_segment(), task->data_segment()->size());
+
+        // attach in the new address space
+        _code = _as->attach(_cs, task->code());
+        _data = _as->attach(_ds, task->data());
+
+        // set the entry as specified (or the same as the current task)
+        _entry = entry ? entry : task->entry();
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), _entry, an ...);
     }
 
     ~Task();
@@ -204,7 +234,6 @@ public:
 
 private:
     void activate() const {
-//        _current = const_cast<Task *>(this);
         _as->activate();
     }
 
@@ -232,14 +261,14 @@ private:
 
 // Thread inline methods that depend on Task
 // Threads with the default configuration are only used in single-task scenarios, since the framework's agent always creates a configuration
-//template<typename ... Tn>
-//inline Thread::Thread(int (* entry)(Tn ...), Tn ... an)
-//: _task(Task::self()), _user_stack(0), _state(READY), _waiting(0), _joining(0), _link(this, NORMAL)
-//{
-//    constructor_prologue(STACK_SIZE);
-//    _context = CPU::init_stack(0, _stack + STACK_SIZE, &__exit, entry, an ...);
-//    constructor_epilogue(entry, STACK_SIZE);
-//}
+template<typename ... Tn>
+inline Thread::Thread(int (* entry)(Tn ...), Tn ... an)
+: _task(Task::self()), _state(READY), _waiting(0), _joining(0), _link(this, NORMAL)
+{
+    constructor_prologue(STACK_SIZE);
+    _context = CPU::init_stack(0, _stack + STACK_SIZE, &__exit, entry, an ...);
+    constructor_epilogue(entry, STACK_SIZE);
+}
 
 template<typename ... Tn>
 inline Thread::Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... an)

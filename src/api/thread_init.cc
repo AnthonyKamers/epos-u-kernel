@@ -39,13 +39,12 @@ void Thread::init()
                                     new (SYSTEM) Address_Space(MMU::current()),
                                     cs,
                                     ds,
-                                    Log_Addr(Memory_Map::APP_CODE), 
+                                    Log_Addr(Memory_Map::APP_CODE),
                                     Log_Addr(Memory_Map::APP_DATA),
                                     main,
                                     static_cast<int>(si->lm.app_extra_size), 
                                     reinterpret_cast<char **>(si->lm.app_extra));
 
-    //Novo AS? Ou já criou?
     db<Setup>(TRC) << "app_task = " << hex << app_task << endl;
 
 #endif
