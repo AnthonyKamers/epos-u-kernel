@@ -511,9 +511,11 @@ if(interrupt) {
 inline void CPU::Context::pop(bool interrupt)
 {
     ASM("       ld       x3,    0(sp)           \n");   // pop PC into TMP
-if(interrupt) {
-    ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
-}
+
+    if(interrupt) {
+        ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
+    }
+
     if (multitask) {
         ASM("       csrw     sepc, x3               \n");   // SEPC = PC
     } else {
@@ -521,10 +523,17 @@ if(interrupt) {
     }
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
-if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP is automatically cleared on the [m|s]ret in the ISR, so we need to recover it here
-    ASM("       li       a0,     %0             \n"     // use a0 as a second TMP (it will be restored later) to adjust [M|S]STATUS.[M|S]PP
-        "       or       x3, x3, a0             \n" : : "i"(multitask ? SPP_S : MPP_M));
-}
+
+    // set mstatus/sstatus
+    if(!interrupt) {
+        if (multitask) {
+            ASM("   li      a0, 1 << 8           \n");
+        } else {
+            ASM("   li      a0, 1 << 11           \n");
+        }
+
+        ASM("       or       x3, x3, a0             \n");
+    }
 
     ASM("       ld       x1,   16(sp)           \n"     // pop RA
         "       ld       x5,   24(sp)           \n"     // pop x5-x31
@@ -561,7 +570,7 @@ if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP i
     } else {
         ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
     }
-    
+
 }
 
 inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }

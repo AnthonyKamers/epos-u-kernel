@@ -129,7 +129,6 @@ private:
 
 protected:
     Task * _task;
-    Segment * _user_stack;
 
     char * _stack;
     Context * volatile _context;
@@ -166,7 +165,7 @@ protected:
 
         _current = this;
         activate();
-        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::RUNNING, Thread::MAIN, this, 0), entry, an ...);
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::RUNNING, Thread::MAIN, this), entry, an ...);
     }
 
 public:
@@ -233,19 +232,22 @@ private:
 
 // Thread inline methods that depend on Task
 // Threads with the default configuration are only used in single-task scenarios, since the framework's agent always creates a configuration
-template<typename ... Tn>
-inline Thread::Thread(int (* entry)(Tn ...), Tn ... an)
-: _task(Task::self()), _user_stack(0), _state(READY), _waiting(0), _joining(0), _link(this, NORMAL)
-{
-    constructor_prologue(STACK_SIZE);
-    _context = CPU::init_stack(0, _stack + STACK_SIZE, &__exit, entry, an ...);
-    constructor_epilogue(entry, STACK_SIZE);
-}
+//template<typename ... Tn>
+//inline Thread::Thread(int (* entry)(Tn ...), Tn ... an)
+//: _task(Task::self()), _user_stack(0), _state(READY), _waiting(0), _joining(0), _link(this, NORMAL)
+//{
+//    constructor_prologue(STACK_SIZE);
+//    _context = CPU::init_stack(0, _stack + STACK_SIZE, &__exit, entry, an ...);
+//    constructor_epilogue(entry, STACK_SIZE);
+//}
 
 template<typename ... Tn>
 inline Thread::Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... an)
 : _task(conf.task ? conf.task : Task::self()), _state(conf.state), _waiting(0), _joining(0), _link(this, conf.criterion)
 {
+    constructor_prologue(STACK_SIZE);
+    _context = CPU::init_stack(0, _stack + STACK_SIZE, &__exit, entry, an ...);
+    constructor_epilogue(entry, STACK_SIZE);
 }
 
 __END_SYS

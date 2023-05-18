@@ -20,6 +20,7 @@ void Thread::constructor_prologue(unsigned int stack_size)
 {
     lock();
 
+    _task = Task::self();
     _thread_count++;
     _scheduler.insert(this);
 

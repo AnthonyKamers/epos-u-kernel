@@ -444,7 +444,7 @@ void Setup::setup_app_pt()
     app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::SYS);
 
     // APPLICATION data (contains stack, heap and extra)
-    app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APP);
+    app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::SYS);
 
     for(unsigned int i = 0; i < MMU::pts(MMU::pages(si->lm.app_code_size)); i++)
         db<Setup>(INF) << "APPC_PT[" << &app_code_pt[i] << "]=" << app_code_pt[i] << endl;
