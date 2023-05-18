@@ -23,11 +23,18 @@ extern "C" {
     void _syscall(void * m) { 
         //CPU::syscall(m); 
     }
+
+    int putchar(int character) {
+        static volatile int *uart = (int *)(void *)0x10010000;
+        while (uart[0] < 0);
+        return uart[0] = character & 0xff;
+    }
+
     void _print(const char *s)
     {
-        Message msg(Id(UTILITY_ID, 0), Message::PRINT, reinterpret_cast<unsigned long>(s));
-        msg.act();
+        while (*s) putchar(*s++);
     }
+
     void _print_preamble() {}
     void _print_trailler(bool error) { if(error) _exit(-1); }
 }
