@@ -1,6 +1,7 @@
 // EPOS Task Implementation
 
 #include <process.h>
+#include <framework/main.h>
 
 __BEGIN_SYS
 

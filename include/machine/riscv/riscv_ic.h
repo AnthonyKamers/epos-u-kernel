@@ -94,8 +94,9 @@ public:
     using IC_Common::Interrupt_Id;
     using IC_Common::Interrupt_Handler;
 
-    enum {
-        INT_SYS_TIMER   = EXCS + (multitask ? IRQ_SUP_TIMER : IRQ_MAC_TIMER)
+    enum {       
+        INT_SYS_TIMER = EXCS + (multitask ? IRQ_SUP_TIMER : IRQ_MAC_TIMER),
+        INT_SYSCALL   = CPU::EXC_ENVS
     };
 
 public:
