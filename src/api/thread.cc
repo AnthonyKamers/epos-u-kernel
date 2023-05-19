@@ -40,6 +40,10 @@ void Thread::constructor_epilogue(Log_Addr entry, unsigned int stack_size)
 
     assert((_state != WAITING) && (_state != FINISHING)); // invalid states
 
+    // add into task's thread list
+    if(multitask)
+        _task->insert(this);
+
     if((_state != READY) && (_state != RUNNING))
         _scheduler.suspend(this);
 
@@ -86,6 +90,10 @@ Thread::~Thread()
     case FINISHING: // Already called exit()
         break;
     }
+
+    // remove from task's thread list
+    if (multitask)
+        _task->remove(this);
 
     if(_joining)
         _joining->resume();
@@ -344,6 +352,9 @@ void Thread::dispatch(Thread * prev, Thread * next, bool charge)
             db<Thread>(INF) << "Thread::dispatch:prev={" << prev << ",ctx=" << tmp << "}" << endl;
         }
         db<Thread>(INF) << "Thread::dispatch:next={" << next << ",ctx=" << *next->_context << "}" << endl;
+
+        if (multitask && (next->_task != prev->_task))
+            next->_task->activate();
 
         // The non-volatile pointer to volatile pointer to a non-volatile context is correct
         // and necessary because of context switches, but here, we are locked() and

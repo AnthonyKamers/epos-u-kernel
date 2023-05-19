@@ -8,6 +8,7 @@ Task * volatile Task::_current;
 
 Task::~Task()
 {
+    db<Task>(INF) << "~Task" << endl;
     db<Task>(TRC) << "~Task(this=" << this << ")" << endl;
 
     while(!_threads.empty())

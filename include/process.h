@@ -174,14 +174,31 @@ protected:
     }
 
 public:
+    const static unsigned int BYTES_SEGMENT = 10000;
+
+public:
+    // Thread-like constructor, to only pass the entry point
     template<typename ... Tn>
-    Task(Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
+    Task(int (* entry)(Tn ...), Tn ... an) {
+        db<Task>(TRC) << "Task() -> Making default Task" << endl;
+
+        _as = new (SYSTEM) Address_Space;
+        _cs = new (SYSTEM) Segment(BYTES_SEGMENT, Segment::Flags::SYS);
+        _ds = new (SYSTEM) Segment(BYTES_SEGMENT, Segment::Flags::SYS);
+        _code = _as->attach(_cs);
+        _data = _as->attach(_ds);
+        _entry = entry;
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), entry, an ...);
+    }
+
+    template<typename ... Tn>
+    Task(Segment * cs, Segment * ds, int (* entry)(Tn ...), Tn ... an, Log_Addr code = Memory_Map::APP_CODE, Log_Addr data = Memory_Map::APP_DATA)
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
         db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
 
         _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), entry, an ...);
     }
-    
+
     template<typename ... Tn>
     Task(const Thread::Configuration & conf, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
