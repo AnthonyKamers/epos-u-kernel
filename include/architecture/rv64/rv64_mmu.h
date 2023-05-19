@@ -252,7 +252,8 @@ public:
 
         Log_Addr attach(const Chunk & chunk) {
             for(Log_Addr addr = APP_LOW; addr < APP_HIGH; addr += sizeof(Big_Page)) {
-                if(attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
+                 db<MMU>(INF) << "addr atual: " << addr << endl;
+                if(attachable(addr, chunk.pt(), chunk.pts(), chunk.flags(), chunk.size())) {
                     attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
                     return addr;
                 }
@@ -261,30 +262,36 @@ public:
         }
 
         Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
-            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags()))
+            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags(), chunk.size()))
                 return false;
             attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
             return addr;
         }
 
         void detach(const Chunk & chunk) {
-            unsigned int i = 0;
-            unsigned int j = 0;
-            for(; i < PD_ENTRIES; i++) {
+            unsigned int ates = 0;
+            for(unsigned long i = 0; i < PD_ENTRIES; i++) {
                 Attacher * at = _pd->log()[i];
                 if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
+                    unsigned int emptyAtes = 0;
+                    for(unsigned long j = 0; j < AT_ENTRIES; j++) {
+                        if(unflag(ate2phy((*at)[j])) == unflag(chunk.pt())) {
+                            db<MMU>(INF) << "Entrou" << endl;
                             at->log()[j & (AT_ENTRIES - 1)] = 0;
                             ates++;
+                            emptyAtes++;
+                        } else if (unflag(ate2phy((*at)[j])) == 0) {
+                            emptyAtes ++;
                         }
                     }
-                    if(ates == AT_ENTRIES)
+                    if(emptyAtes == AT_ENTRIES) {
+                        db<MMU>(INF) << "ATTACHER EMPTY, DELETING" << endl;
                         _pd->log()[i] = 0;
+                    }
                 }
             }
-            if((i == PD_ENTRIES) && (j == AT_ENTRIES))
+            db<MMU>(INF) << "ATES: " << ates << endl;
+            if(ates == 0)
                 db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ") failed!" << endl;
             else
                 flush_tlb();
@@ -321,15 +328,21 @@ public:
         }
 
     private:
-        bool attachable(Log_Addr addr, const Page_Table * pt, unsigned int pts, Page_Flags flags) {
+        bool attachable(Log_Addr addr, const Page_Table * pt, unsigned int pts, Page_Flags flags, unsigned int size) {            
             for(unsigned int i = pdi(addr); i < pdi(addr) + ats(pts); i++) {
                 Attacher * at = pde2phy(_pd->log()[i]);
-                if(!at)
+                db<MMU>(INF) << "AT: " << at << endl;
+                db<MMU>(INF) << "i: " << i << endl;
+                if(!at) {
+                    db<MMU>(INF) << "NO ATT HERE" << endl;
                     continue;
+                }
                 else
                     for(unsigned int j = ati(addr); j < ati(addr) + pts; j++, pt++)
-                        if(at->log()[j & (AT_ENTRIES - 1)])
+                        if(at->log()[j & (AT_ENTRIES - 1)]){
+                            db<MMU>(INF) << "NOT ATTACHABLE: " << at->log()[j & (AT_ENTRIES - 1)] << endl;
                             return false;
+                        }
             }
             return true;
         }
