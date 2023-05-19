@@ -10,6 +10,7 @@
 
 #include "scenario.h"
 #include "id.h"
+#include "process.h"
 
 __BEGIN_SYS
 

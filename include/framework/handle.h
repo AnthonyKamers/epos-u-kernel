@@ -8,6 +8,7 @@
 #define __handle_h
 
 #include "stub.h"
+#include "main.h"
 
 __BEGIN_SYS
 

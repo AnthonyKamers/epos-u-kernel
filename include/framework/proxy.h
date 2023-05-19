@@ -6,6 +6,7 @@
 #define __proxy_h
 
 #include "message.h"
+#include "main.h"
 
 __BEGIN_SYS
 

@@ -10,6 +10,7 @@
 #include <synchronizer.h>
 
 #include "message.h"
+#include "handle.h"
 
 __BEGIN_SYS
 

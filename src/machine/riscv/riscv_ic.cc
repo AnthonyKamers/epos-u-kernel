@@ -118,7 +118,7 @@ void IC::exception(Interrupt_Id id)
     if(Traits<Build>::hysterically_debugged)
         db<IC, System>(ERR) << "Exception stopped execution due to hysterically debugging!" << endl;
 
-    CPU::fr(sizeof(void *)); // tell CPU::Context::pop(true) to perform PC = PC + [4|8] on return
+    CPU::fr(4); // tell CPU::Context::pop(true) to perform PC = PC + [4|8] on return
 }
 
 __END_SYS
