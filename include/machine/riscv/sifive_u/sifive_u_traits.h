@@ -20,6 +20,11 @@ public:
     // Value to be used for undefined addresses
     static const unsigned int NOT_USED          = 0xffffffff;
 
+    // Default Sizes and Quantities
+    static const unsigned int MAX_THREADS       = 16;
+    static const unsigned int STACK_SIZE        = 128 * 1024;
+    static const unsigned int HEAP_SIZE         = 4 * 1024 * 1024;
+
     // Clocks
     static const unsigned int CLOCK             = 1000000000;                            // CORECLK
     static const unsigned int HFCLK             =   33330000;                            // FU540-C000 generates all internal clocks from 33.33 MHz hfclk driven from an external oscillator (HFCLKIN) or crystal (HFOSCIN) input, selected by input HFXSEL.
@@ -28,31 +33,27 @@ public:
 
     // Physical Memory
     static const unsigned long RAM_BASE          = 0x80000000;                           // 2 GB
-    static const unsigned long RAM_TOP           = 0x87ffffff;                           // 2 GB + 128 MB (max 1536 MB of RAM => RAM + MIO < 2 G)
+    static const unsigned long RAM_TOP           = 0x87ffffff - 1;                           // 2 GB + 128 MB (max 1536 MB of RAM => RAM + MIO < 2 G)
     static const unsigned long MIO_BASE          = 0x00000000;
     static const unsigned long MIO_TOP           = 0x1fffffff;                           // 512 MB (max 512 MB of MIO => RAM + MIO < 2 G)
 
     // Physical Memory at Boot
     static const unsigned long BOOT              = NOT_USED;
     static const unsigned long SETUP             = RAM_BASE;        // library ? NOT_USED : RAM_BASE; RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
-    static const unsigned long IMAGE             = 0x87000000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
+    static const unsigned long BOOT_STACK        = SETUP + 1024;
+    static const unsigned long IMAGE             = BOOT_STACK + STACK_SIZE;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
 
     // Logical Memory
-    static const unsigned long INIT              = 0x87f00000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
-    static const unsigned long PHY_MEM           = 0x20000000;      // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
     static const unsigned long IO                = 0x0000000000000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
-    static const unsigned long SYS               = 0xff800000;                           // 4 GB - 8 MB
+    static const unsigned long PHY_MEM           = 0x0000000020000000;                          // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
+    static const unsigned long INIT              = 0x0000007fff800000;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
+    static const unsigned long SYS               = INIT + 0x400000;                           // 4 GB - 8 MB
 
-    static const unsigned long APP_LOW           = 0x80400000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
-    static const unsigned long APP_HIGH          = 0xdfffffff;
-
-    static const unsigned long APP_CODE          = APP_LOW;
-    static const unsigned long APP_DATA          = APP_CODE + 4 * 1024 * 1024;
-
-    // Default Sizes and Quantities
-    static const unsigned int MAX_THREADS       = 16;
-    static const unsigned int STACK_SIZE        = 128 * 1024;
-    static const unsigned int HEAP_SIZE         = 4 * 1024 * 1024;
+//    static const unsigned long APP_LOW           = 0x80400000;      // library ? RAM_BASE : 0x80400000; 2 GB + 4 MB
+    static const unsigned long APP_HIGH          = 0xffffffffffffffff;
+//
+//    static const unsigned long APP_CODE          = APP_LOW;
+//    static const unsigned long APP_DATA          = APP_CODE + 4 * 1024 * 1024;
 };
 
 template <> struct Traits<IC>: public Traits<Machine_Common>
