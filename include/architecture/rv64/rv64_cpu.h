@@ -324,13 +324,21 @@ public:
     using CPU_Common::htons;
     using CPU_Common::ntohl;
     using CPU_Common::ntohs;
-
+    
     template<typename ... Tn>
     static Context * init_stack(Log_Addr usp, Log_Addr sp, void (* exit)(), int (* entry)(Tn ...), Tn ... an) {
         sp -= sizeof(Context);
         Context * ctx = new(sp) Context(entry, exit);
         init_stack_helper(&ctx->_x10, an ...); // x10 is a0
         return ctx;
+    }
+    template <typename... Tn>
+    static Log_Addr init_user_stack(Log_Addr sp, void (*exit)(), Tn... an)
+    {
+        sp -= sizeof(Context);
+        Context *ctx = new (sp) Context(0, exit);
+        init_stack_helper(&ctx->_x10, an...); // x10 is a0
+        return sp;
     }
 
 public:

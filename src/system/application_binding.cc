@@ -26,7 +26,7 @@ extern "C" {
 __USING_SYS;
 extern "C" {
     void _syscall(void * m) {
-//        CPU::syscall(m);
+        CPU::syscall(m);
     }
 
     int putchar(int character) {
