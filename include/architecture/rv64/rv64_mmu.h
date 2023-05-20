@@ -7,6 +7,7 @@
 #include <architecture/mmu.h>
 #undef __mmu_common_only__
 #include <system/memory_map.h>
+#include <utility/math.h> 
 
 __BEGIN_SYS
 
@@ -243,7 +244,7 @@ public:
 
         Directory(Page_Directory * pd): _free(false), _pd(pd) {}
 
-        ~Directory() { if(_free) free(_pd); }
+        ~Directory() { if(_free) free(_pd, (sizeof(Page_Directory) / sizeof(Page)) - 1); } //Pra não pegar a página dos interrupt
 
         Phy_Addr pd() const { return _pd; }
 
@@ -253,37 +254,51 @@ public:
             for(Log_Addr addr = APP_LOW; addr < APP_HIGH; addr += sizeof(Big_Page)) {
                 if(attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
                     attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
+                    db<MMU>(INF) << "FOI O ATTACH " << endl;
                     return addr;
                 }
             }
+            db<MMU>(INF) << "NÃO FOI ATTACH" << endl;
             return Log_Addr(false);
         }
 
         Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
             if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
-                db<Setup>(WRN) << "NOT ATTACHABLE!" << endl;
+                db<MMU>(INF) << "NÃO FOI ATTACH" << endl;
                 return false;
             }
             attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
-            db<Setup>(WRN) << "ATTACHED!" << endl;
+            db<MMU>(INF) << "FOI O ATTACH " << endl;
             return addr;
         }
 
         void detach(const Chunk & chunk) {
             unsigned int i = 0;
             unsigned int j = 0;
+            const Page_Table *chunkPt = chunk.pt();
+            unsigned int chunkPts = chunk.pts();
+            
             for(; i < PD_ENTRIES; i++) {
-                Attacher * at = _pd->log()[i];
+                Attacher * at = pde2phy(_pd->log()[i]);
                 if(at) {
-                    unsigned int ates = 0;
+                    bool canFree = true;
                     for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
+                        if(unflag(ate2phy(at->log()[j])) == unflag(chunkPt)) {
                             at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        }
+                            chunkPt++;
+                            chunkPts--;
+                        } else if (at->log()[j])
+                            canFree = false;
                     }
-                    if(ates == AT_ENTRIES)
+
+                    if(canFree) {
                         _pd->log()[i] = 0;
+                        free(at);
+                    }
+
+                    if(!chunkPts) {
+                        break;
+                    }
                 }
             }
             if((i == PD_ENTRIES) && (j == AT_ENTRIES))
@@ -295,21 +310,23 @@ public:
         void detach(const Chunk & chunk, Log_Addr addr) {
             unsigned int i = pdi(addr);
             unsigned int j = ati(addr);
+            const Page_Table *chunkPt = chunk.pt();
             for(; i < pds(ats(chunk.pts())); i++) {
-                Attacher * at = _pd->log()[i];
+                Attacher * at = pde2phy(_pd->log()[i]);
                 if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
+                    bool canFree = true;
+                    for(; j < AT_ENTRIES; j++) {
+                        if(unflag(ate2phy(at->log()[j])) == unflag(chunk.pt())) {
                             at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        } else {
-                            db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ",addr=" << addr << ") failed!" << endl;
-                            return;
+                            chunkPt++;
+                        } else if (at->log()[j]){
+                            canFree = false;
                         }
                     }
-                    if(ates == AT_ENTRIES)
+                    if(canFree) {
                         _pd->log()[i] = 0;
+                        free(at);
+                    }
                 }
             }
             flush_tlb();
@@ -328,10 +345,12 @@ public:
                 Attacher * at = pde2phy(_pd->log()[i]);
                 if(!at)
                     continue;
-                else
-                    for(unsigned int j = ati(addr); j < ati(addr) + pts; j++, pt++)
+                else {
+                    unsigned int limit = Math::min(pts, AT_ENTRIES);
+                    for(unsigned int j = ati(addr); j < ati(addr) + limit; j++, pt++)
                         if(at->log()[j & (AT_ENTRIES - 1)])
                             return false;
+                }
             }
             return true;
         }
@@ -343,7 +362,8 @@ public:
                     at = calloc(1, WHITE);
                     _pd->log()[i] = phy2pde(Phy_Addr(at));
                 }
-                for(unsigned int j = ati(addr); j < ati(addr) + pts; j++, pt++)
+                unsigned int limit = Math::min(pts, AT_ENTRIES);
+                for(unsigned int j = ati(addr); j < ati(addr) + limit; j++, pt++)
                     at->log()[j & (AT_ENTRIES - 1)] = phy2ate(Phy_Addr(pt));
             }
             return true;
