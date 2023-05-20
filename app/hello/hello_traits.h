@@ -128,7 +128,7 @@ template<> struct Traits<Thread>: public Traits<Build>
     static const bool simulate_capacity = false;
     static const unsigned int QUANTUM = 10000; // us
 
-    typedef Priority Criterion;
+    typedef RR Criterion;
 };
 
 template<> struct Traits<Scheduler<Thread>>: public Traits<Build>

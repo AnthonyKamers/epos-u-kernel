@@ -444,7 +444,6 @@ private:
         init_stack_helper(sp + sizeof(Head *), tail ...);
     }
     static void init_stack_helper(Log_Addr sp) {}
-
     static void init();
 
 private:
@@ -458,17 +457,17 @@ inline void CPU::Context::push(bool interrupt)
 {
     ASM("       addi     sp, sp, %0             \n" : : "i"(-sizeof(Context))); // adjust SP for the pushes below
 
-if(interrupt) {
-    if (multitask) {
-        ASM("       csrr     x3,    sepc            \n"
-            "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
+    if(interrupt) {
+        if (multitask) {
+            ASM("       csrr     x3,    sepc            \n"
+                "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
+        } else {
+            ASM("       csrr     x3,    mepc            \n"
+                "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
+        }
     } else {
-        ASM("       csrr     x3,    mepc            \n"
-            "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
+        ASM("           sd       x1,    0(sp)           \n");   // push RA as PC on context switches
     }
-} else {
-    ASM("           sw       x1,    0(sp)           \n");   // push RA as PC on context switches
-}
 
     if (multitask)
     {
@@ -523,16 +522,9 @@ inline void CPU::Context::pop(bool interrupt)
     }
 
     ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
-
-    // set mstatus/sstatus
-    if(!interrupt) {
-        if (multitask) {
-            ASM("   li      a0, 1 << 8           \n");
-        } else {
-            ASM("   li      a0, 1 << 11           \n");
-        }
-
-        ASM("       or       x3, x3, a0             \n");
+    if(!interrupt) {                                        // [M|S]STATUS.[M|S]PP is automatically cleared on the [m|s]ret in the ISR, so we need to recover it here
+        ASM("       li       a0,     %0             \n"     // use a0 as a second TMP (it will be restored later) to adjust [M|S]STATUS.[M|S]PP
+            "       or       x3, x3, a0             \n" : : "i"(multitask ? SPP_S : MPP_M));
     }
 
     ASM("       ld       x1,   16(sp)           \n"     // pop RA

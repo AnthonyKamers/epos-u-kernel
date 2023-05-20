@@ -140,7 +140,7 @@ Setup::Setup()
         setup_sys_pd();
 
         // Relocate the machine to supervisor interrupt forwarder
-        //setup_m2s();
+        setup_m2s();
 
         // Enable paging
         enable_paging();
@@ -193,11 +193,11 @@ void Setup::build_lm()
     db<Setup>(TRC) << "Setup::build_lm()" << endl;
 
     // Get boot image structure
-    si->lm.has_stp = (si->bm.setup_offset != -1ul);
-    si->lm.has_ini = (si->bm.init_offset != -1ul);
-    si->lm.has_sys = (si->bm.system_offset != -1ul);
-    si->lm.has_app = (si->bm.application_offset != -1ul);
-    si->lm.has_ext = (si->bm.extras_offset != -1ul);
+    si->lm.has_stp = (si->bm.setup_offset != -1u);
+    si->lm.has_ini = (si->bm.init_offset != -1u);
+    si->lm.has_sys = (si->bm.system_offset != -1u);
+    si->lm.has_app = (si->bm.application_offset != -1u);
+    si->lm.has_ext = (si->bm.extras_offset != -1u);
 
     // Check SETUP integrity and get the size of its segments
     if(si->lm.has_stp) {
@@ -524,12 +524,12 @@ void Setup::setup_sys_pd()
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the OS at " << reinterpret_cast<void *>(SYS) << "!" << endl;
 
     // Attach the first APPLICATION CODE (i.e. app_code_pt)
-    Chunk app_code(si->pmm.app_code_pt, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APPC);
+    Chunk app_code(si->pmm.app_code_pt, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::SYS);
     if(dir.attach(app_code, si->lm.app_code) != si->lm.app_code)
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the application code at " << reinterpret_cast<void *>(si->lm.app_code) << "!" << endl;
 
     // Attach the first APPLICATION DATA (i.e. app_data_pt, containing heap, stack and extra)
-    Chunk app_data(si->pmm.app_data_pt, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APPD);
+    Chunk app_data(si->pmm.app_data_pt, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::SYS);
     if(dir.attach(app_data, si->lm.app_data) != si->lm.app_data)
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the application data at " << reinterpret_cast<void *>(si->lm.app_data) << "!" << endl;
 
@@ -671,11 +671,11 @@ void Setup::adjust_perms()
 
     // APPLICATION code
     for(i = 0, aux = si->pmm.app_code; i < MMU::pages(si->lm.app_code_size); i++, aux = aux + sizeof(Page))
-        app_code_pt[MMU::pti(APP_CODE) + i] = MMU::phy2pte(aux, Flags::APPC);
+        app_code_pt[MMU::pti(APP_CODE) + i] = MMU::phy2pte(aux, Flags::SYS);
 
     // APPLICATION data (contains stack, heap and extra)
     for(i = 0, aux = si->pmm.app_data; i < MMU::pages(si->lm.app_data_size); i++, aux = aux + sizeof(Page))
-        app_data_pt[MMU::pti(APP_DATA) + i] = MMU::phy2pte(aux, Flags::APPD);
+        app_data_pt[MMU::pti(APP_DATA) + i] = MMU::phy2pte(aux, Flags::SYS);
 }
 
 
@@ -732,7 +732,7 @@ void _entry() // machine mode
         CPU::halt();
 
     CPU::mstatusc(CPU::MIE);                            // disable interrupts (they will be reenabled at Init_End)
-    CPU::mie(CPU::MSI | CPU::MEI);                      // enable interrupts generation by CLINT at machine level
+    CPU::mie(CPU::MSI | CPU::MTI | CPU::MEI);           // enable interrupts generation by CLINT at machine level
 
     CPU::tp(CPU::mhartid());                            // tp will be CPU::id() for supervisor mode
     CPU::sp(Memory_Map::BOOT_STACK + Traits<Machine>::STACK_SIZE - sizeof(long)); // set the stack pointer, thus creating a stack for SETUP
@@ -740,12 +740,11 @@ void _entry() // machine mode
     Machine::clear_bss();
 
     if(Traits<System>::multitask) {
-//        CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
-        CLINT::mtvec(CLINT::DIRECT, &_int_m2s); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
-        CPU::mideleg(0xffff);                           // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
-        CPU::medeleg(0xffff);                           // delegate all exceptions to supervisor mode
-        CPU::mstatuss(CPU::MPP_S);                      // prepare jump into supervisor mode at mret
-        CPU::sstatuss(CPU::SUM);                        // allows User Memory access in supervisor mode
+        CLINT::mtvec(CLINT::DIRECT, Memory_Map::INT_M2S); // setup a machine mode interrupt handler to forward timer interrupts (which cannot be delegated via mideleg)
+        CPU::mideleg(0xffff);                                       // delegate all possible interrupts to supervisor mode (MTI can't be delegated https://groups.google.com/a/groups.riscv.org/g/sw-dev/c/A5XmyE5FE_0/m/TEnvZ0g4BgAJ)
+        CPU::medeleg(0xffff);                                       // delegate all exceptions to supervisor mode
+        CPU::mstatuss(CPU::MPP_S | CPU::MPIE);                      // prepare jump into supervisor mode at mret
+        CPU::sstatuss(CPU::SUM);                                    // allows User Memory access in supervisor mode
     } else {
         CPU::mstatus(CPU::MPP_M);                       // stay in machine mode at mret
     }
@@ -771,19 +770,19 @@ void _int_m2s()
 {
     // Save context
     ASM("       csrw    mscratch, sp                                 \n");
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
-        "       sw       a2, -12(sp)            \n"
-        "       sw       a3, -16(sp)            \n"
-        "       sw       a4, -20(sp)            \n"
-        "       sw       a5, -24(sp)            \n");
-} else {
-    ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
-        "       sd       a2, -20(sp)            \n"
-        "       sd       a3, -28(sp)            \n"
-        "       sd       a4, -36(sp)            \n"
-        "       sd       a5, -44(sp)            \n");
-}
+    if(Traits<CPU>::WORD_SIZE == 32) {
+        ASM("       auipc    sp,      1             \n" // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
+            "       sw       a2, -12(sp)            \n"
+            "       sw       a3, -16(sp)            \n"
+            "       sw       a4, -20(sp)            \n"
+            "       sw       a5, -24(sp)            \n");
+    } else {
+        ASM("       auipc    sp,      1             \n" // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
+            "       sd       a2, -20(sp)            \n"
+            "       sd       a3, -28(sp)            \n"
+            "       sd       a4, -36(sp)            \n"
+            "       sd       a5, -44(sp)            \n");
+    }
 
     CPU::Reg id = CPU::mcause();
 
@@ -798,17 +797,18 @@ if(Traits<CPU>::WORD_SIZE == 32) {
         CPU::mips(i); // forward to supervisor mode
 
     // Restore context
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("       lw       a2, -12(sp)            \n"
-        "       lw       a3, -16(sp)            \n"
-        "       lw       a4, -20(sp)            \n"
-        "       lw       a5, -24(sp)            \n");
-} else {
-    ASM("       ld       a2, -20(sp)            \n"
-        "       ld       a3, -28(sp)            \n"
-        "       ld       a4, -36(sp)            \n"
-        "       ld       a5, -44(sp)            \n");
-}
+    if (Traits<CPU>::WORD_SIZE == 32) {
+        ASM("       lw       a2, -12(sp)            \n"
+            "       lw       a3, -16(sp)            \n"
+            "       lw       a4, -20(sp)            \n"
+            "       lw       a5, -24(sp)            \n");
+    } else {
+        ASM("       ld       a2, -20(sp)            \n"
+            "       ld       a3, -28(sp)            \n"
+            "       ld       a4, -36(sp)            \n"
+            "       ld       a5, -44(sp)            \n");
+    }
+
     ASM("       csrr     sp, mscratch           \n"
         "       mret                            \n");
 }
