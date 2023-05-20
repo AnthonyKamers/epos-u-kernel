@@ -162,8 +162,10 @@ protected:
     template<typename ... Tn>
     Task(Address_Space * as, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
     : _as(as), _cs(cs), _ds(ds),
-      _code(_as->attach(_cs, code)),
-      _data(_as->attach(_ds, data)),
+//      _code(_as->attach(_cs, code)),
+//      _data(_as->attach(_ds, data)),
+        _code(code),
+        _data(data),
       _entry(entry)
     {
         db<Task, Init>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",code=" << _code << ",data=" << _data << ",entry=" << _entry << ") => " << this << endl;
