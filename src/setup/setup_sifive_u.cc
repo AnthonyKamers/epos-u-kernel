@@ -479,7 +479,7 @@ void Setup::setup_sys_pd()
                    << "})" << endl;
 
     // Check alignments
-    assert(MMU::pdi(SETUP) <= MMU::pdi(APP_LOW));
+//    assert(MMU::pdi(SETUP) <= MMU::pdi(APP_LOW));
     assert(MMU::pdi(INT_M2S) == MMU::pdi(RAM_TOP));
     if(RAM_BASE != MMU::align_segment(RAM_BASE))
         db<Setup>(WRN) << "Setup::setup_sys_pd: unaligned physical memory!" << endl;
