@@ -7,6 +7,7 @@
 #include <architecture/mmu.h>
 #undef __mmu_common_only__
 #include <system/memory_map.h>
+#include <utility/math.h> 
 
 __BEGIN_SYS
 
@@ -22,9 +23,9 @@ private:
     static const bool colorful = Traits<MMU>::colorful;
     static const unsigned long COLORS = Traits<MMU>::COLORS;
     static const unsigned long RAM_BASE = Memory_Map::RAM_BASE;
+    static const unsigned long PHY_MEM = Memory_Map::PHY_MEM;
     static const unsigned long APP_LOW = Memory_Map::APP_LOW;
     static const unsigned long APP_HIGH = Memory_Map::APP_HIGH;
-    static const unsigned long PHY_MEM = Memory_Map::PHY_MEM;
 
 public:
     // Page Flags
@@ -239,12 +240,11 @@ public:
             for(unsigned int i = 0; i < PD_ENTRIES; i++)
                 if(!((i >= pdi(APP_LOW)) && (i <= pdi(APP_HIGH))))
                     _pd->log()[i] = _master->log()[i];
-
         }
 
         Directory(Page_Directory * pd): _free(false), _pd(pd) {}
 
-        ~Directory() { if(_free) free(_pd); }
+        ~Directory() { if(_free) free(_pd, sizeof(Page_Directory) / sizeof(Page)); }
 
         Phy_Addr pd() const { return _pd; }
 
@@ -252,46 +252,56 @@ public:
 
         Log_Addr attach(const Chunk & chunk) {
             for(Log_Addr addr = APP_LOW; addr < APP_HIGH; addr += sizeof(Big_Page)) {
-                 db<MMU>(INF) << "addr atual: " << addr << endl;
-                if(attachable(addr, chunk.pt(), chunk.pts(), chunk.flags(), chunk.size())) {
+                if(attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
                     attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
+                    db<MMU>(INF) << "FOI O ATTACH " << endl;
                     return addr;
                 }
             }
+            db<MMU>(INF) << "NÃO FOI ATTACH" << endl;
             return Log_Addr(false);
         }
 
         Log_Addr attach(const Chunk & chunk, Log_Addr addr) {
-            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags(), chunk.size()))
+            if(!attachable(addr, chunk.pt(), chunk.pts(), chunk.flags())) {
+                db<MMU>(INF) << "NÃO FOI ATTACH" << endl;
                 return false;
+            }
             attach(addr, chunk.pt(), chunk.pts(), chunk.flags());
+            db<MMU>(INF) << "FOI O ATTACH " << endl;
             return addr;
         }
 
         void detach(const Chunk & chunk) {
-            unsigned int ates = 0;
-            for(unsigned long i = 0; i < PD_ENTRIES; i++) {
-                Attacher * at = _pd->log()[i];
+            unsigned int i = 0;
+            unsigned int j = 0;
+            const Page_Table *chunkPt = chunk.pt();
+            unsigned int chunkPts = chunk.pts();
+            
+            for(; i < PD_ENTRIES; i++) {
+                Attacher * at = pde2phy(_pd->log()[i]);
                 if(at) {
-                    unsigned int emptyAtes = 0;
-                    for(unsigned long j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[j])) == unflag(chunk.pt())) {
-                            db<MMU>(INF) << "Entrou" << endl;
+                    bool canFree = true;
+                    for(j = 0; j < AT_ENTRIES; j++) {
+                        if(unflag(ate2phy(at->log()[j])) == unflag(chunkPt)) {
                             at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                            emptyAtes++;
-                        } else if (unflag(ate2phy((*at)[j])) == 0) {
-                            emptyAtes ++;
-                        }
+                            chunkPt++;
+                            chunkPts--;
+                        } else if (at->log()[j])
+                            canFree = false;
                     }
-                    if(emptyAtes == AT_ENTRIES) {
-                        db<MMU>(INF) << "ATTACHER EMPTY, DELETING" << endl;
+
+                    if(canFree) {
                         _pd->log()[i] = 0;
+                        free(at);
+                    }
+
+                    if(!chunkPts) {
+                        break;
                     }
                 }
             }
-            db<MMU>(INF) << "ATES: " << ates << endl;
-            if(ates == 0)
+            if((i == PD_ENTRIES) && (j == AT_ENTRIES))
                 db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ") failed!" << endl;
             else
                 flush_tlb();
@@ -300,21 +310,23 @@ public:
         void detach(const Chunk & chunk, Log_Addr addr) {
             unsigned int i = pdi(addr);
             unsigned int j = ati(addr);
+            const Page_Table *chunkPt = chunk.pt();
             for(; i < pds(ats(chunk.pts())); i++) {
-                Attacher * at = _pd->log()[i];
+                Attacher * at = pde2phy(_pd->log()[i]);
                 if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
+                    bool canFree = true;
+                    for(; j < AT_ENTRIES; j++) {
+                        if(unflag(ate2phy(at->log()[j])) == unflag(chunk.pt())) {
                             at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        } else {
-                            db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ",addr=" << addr << ") failed!" << endl;
-                            return;
+                            chunkPt++;
+                        } else if (at->log()[j]){
+                            canFree = false;
                         }
                     }
-                    if(ates == AT_ENTRIES)
+                    if(canFree) {
                         _pd->log()[i] = 0;
+                        free(at);
+                    }
                 }
             }
             flush_tlb();
@@ -328,21 +340,17 @@ public:
         }
 
     private:
-        bool attachable(Log_Addr addr, const Page_Table * pt, unsigned int pts, Page_Flags flags, unsigned int size) {            
+        bool attachable(Log_Addr addr, const Page_Table * pt, unsigned int pts, Page_Flags flags) {
             for(unsigned int i = pdi(addr); i < pdi(addr) + ats(pts); i++) {
                 Attacher * at = pde2phy(_pd->log()[i]);
-                db<MMU>(INF) << "AT: " << at << endl;
-                db<MMU>(INF) << "i: " << i << endl;
-                if(!at) {
-                    db<MMU>(INF) << "NO ATT HERE" << endl;
+                if(!at)
                     continue;
-                }
-                else
-                    for(unsigned int j = ati(addr); j < ati(addr) + pts; j++, pt++)
-                        if(at->log()[j & (AT_ENTRIES - 1)]){
-                            db<MMU>(INF) << "NOT ATTACHABLE: " << at->log()[j & (AT_ENTRIES - 1)] << endl;
+                else {
+                    unsigned int limit = Math::min(pts, AT_ENTRIES);
+                    for(unsigned int j = ati(addr); j < ati(addr) + limit; j++, pt++)
+                        if(at->log()[j & (AT_ENTRIES - 1)])
                             return false;
-                        }
+                }
             }
             return true;
         }
@@ -354,7 +362,8 @@ public:
                     at = calloc(1, WHITE);
                     _pd->log()[i] = phy2pde(Phy_Addr(at));
                 }
-                for(unsigned int j = ati(addr); j < ati(addr) + pts; j++, pt++)
+                unsigned int limit = Math::min(pts, AT_ENTRIES);
+                for(unsigned int j = ati(addr); j < ati(addr) + limit; j++, pt++)
                     at->log()[j & (AT_ENTRIES - 1)] = phy2ate(Phy_Addr(pt));
             }
             return true;
@@ -433,10 +442,10 @@ public:
                 phy = e->object() + e->size();
                 db<MMU>(TRC) << "MMU::alloc(frames=" << frames << ",color=" << color << ") => " << phy << endl;
             } else
-                if(colorful)
-                    db<MMU>(INF) << "MMU::alloc(frames=" << frames << ",color=" << color << ") => failed!" << endl;
-                else
-                    db<MMU>(WRN) << "MMU::alloc(frames=" << frames << ",color=" << color << ") => failed!" << endl;
+            if(colorful)
+                db<MMU>(INF) << "MMU::alloc(frames=" << frames << ",color=" << color << ") => failed!" << endl;
+            else
+                db<MMU>(WRN) << "MMU::alloc(frames=" << frames << ",color=" << color << ") => failed!" << endl;
         }
 
         return phy;
@@ -497,8 +506,8 @@ public:
 
 #ifdef __setup__
     // SETUP uses the MMU to build a primordial memory model before turning the MMU on, so no log vs phy adjustments are made
-    static Log_Addr phy2log(Phy_Addr phy) { return Log_Addr((RAM_BASE == PHY_MEM) ? phy : (RAM_BASE > PHY_MEM) ? phy : phy ); }
-    static Phy_Addr log2phy(Log_Addr log) { return Phy_Addr((RAM_BASE == PHY_MEM) ? log : (RAM_BASE > PHY_MEM) ? log : log ); }
+static Log_Addr phy2log(Phy_Addr phy) { return Log_Addr((RAM_BASE == PHY_MEM) ? phy : (RAM_BASE > PHY_MEM) ? phy : phy ); }
+static Phy_Addr log2phy(Log_Addr log) { return Phy_Addr((RAM_BASE == PHY_MEM) ? log : (RAM_BASE > PHY_MEM) ? log : log ); }
 #else
     static Log_Addr phy2log(Phy_Addr phy) { return Log_Addr((RAM_BASE == PHY_MEM) ? phy : (RAM_BASE > PHY_MEM) ? phy - (RAM_BASE - PHY_MEM) : phy + (PHY_MEM - RAM_BASE)); }
     static Phy_Addr log2phy(Log_Addr log) { return Phy_Addr((RAM_BASE == PHY_MEM) ? log : (RAM_BASE > PHY_MEM) ? log + (RAM_BASE - PHY_MEM) : log - (PHY_MEM - RAM_BASE)); }
