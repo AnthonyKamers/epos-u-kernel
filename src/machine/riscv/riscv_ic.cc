@@ -118,7 +118,10 @@ void IC::exception(Interrupt_Id id)
     if(Traits<Build>::hysterically_debugged)
         db<IC, System>(ERR) << "Exception stopped execution due to hysterically debugging!" << endl;
 
-    CPU::fr(sizeof(void *)); // tell CPU::Context::pop(true) to perform PC = PC + [4|8] on return
+//    CPU::fr(sizeof(void *)); // tell CPU::Context::pop(true) to perform PC = PC + [4|8] on return
+
+    // Although it is 64 bits architecture, the PC is 32 bits for Risc-V 64
+    CPU::fr(4);
 }
 
 __END_SYS

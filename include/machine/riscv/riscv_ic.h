@@ -87,15 +87,17 @@ private:
     static const bool multitask = Traits<System>::multitask;
 
 public:
-    static const unsigned int EXCS = CPU::EXCEPTIONS;
-    static const unsigned int IRQS = CLINT::IRQS;
-    static const unsigned int INTS = EXCS + IRQS;
+    static const unsigned int EXCS      = CPU::EXCEPTIONS;
+    static const unsigned int IRQS      = CLINT::IRQS;
+    static const unsigned int INTS      = EXCS + IRQS;
+    static const unsigned int EXC_ENVS  = CPU::EXC_ENVS;
 
     using IC_Common::Interrupt_Id;
     using IC_Common::Interrupt_Handler;
 
     enum {
-        INT_SYS_TIMER   = EXCS + (multitask ? IRQ_SUP_TIMER : IRQ_MAC_TIMER)
+        INT_SYS_TIMER   = EXCS + (multitask ? IRQ_SUP_TIMER : IRQ_MAC_TIMER),
+        INT_SYSCALL     = EXC_ENVS
     };
 
 public:

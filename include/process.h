@@ -194,6 +194,13 @@ public:
     }
 
     template<typename ... Tn>
+    Task(Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)
+            : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
+        db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
+        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this, 0), entry, an...);
+    }
+
+    template<typename ... Tn>
     Task(Segment * cs, Segment * ds, int (* entry)(Tn ...), Tn ... an, Log_Addr code = Memory_Map::APP_CODE, Log_Addr data = Memory_Map::APP_DATA)
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
         db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
@@ -230,8 +237,8 @@ public:
         _data = _as->attach(_ds, task->data());
 
         // set the entry as specified (or the same as the current task)
-        _entry = entry ? entry : task->entry();
-        _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), _entry, an ...);
+        _entry = entry ? entry : static_cast<int (*)(Tn...)>(current()->entry());
+        this->_main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::MAIN, this), static_cast<int (*)(Tn...)>(_entry), an...);
     }
 
     ~Task();
