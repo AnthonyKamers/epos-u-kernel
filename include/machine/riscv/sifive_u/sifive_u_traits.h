@@ -67,7 +67,7 @@ template <> struct Traits<Timer>: public Traits<Machine_Common>
     // choice must respect the scheduler time-slice, i. e., it must be higher
     // than the scheduler invocation frequency.
     static const int FREQUENCY = 1000; // Hz
-    static const bool enabled = false;
+    static const bool enabled = true;
 };
 
 template <> struct Traits<UART>: public Traits<Machine_Common>
