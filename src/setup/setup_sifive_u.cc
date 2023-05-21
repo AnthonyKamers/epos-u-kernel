@@ -296,6 +296,11 @@ void Setup::build_pmm()
     // System Page Table
     si->pmm.sys_pt = MMU::calloc(MMU::pts(MMU::pages(SYS_HIGH - SYS)));
 
+    // Init page table
+    si->pmm.init_pt = MMU::calloc(MMU::pts(MMU::pages(si->lm.ini_code_size + si->lm.ini_data_size)));
+    si->pmm.init_code = MMU::calloc(MMU::pages(si->lm.ini_code_size));
+    si->pmm.init_data = MMU::calloc(MMU::pages(si->lm.ini_data_size));
+
     // Page tables to map the whole physical memory
     // = NP/NPTE_PT * sizeof(Page)
     //   NP = size of physical memory in pages
@@ -398,6 +403,11 @@ void Setup::setup_sys_pt()
                    << ",sysd={b=" << reinterpret_cast<void *>(si->pmm.sys_data) << ",s=" << MMU::pages(si->lm.sys_data_size) << "}"
                    << ",syss={b=" << reinterpret_cast<void *>(si->pmm.sys_stack) << ",s=" << MMU::pages(si->lm.sys_stack_size) << "}"
                    << "})" << endl;
+
+    // Init page table
+    Page_Table * init_pt = reinterpret_cast<Page_Table *>(si->pmm.init_pt);
+    init_pt->remap(si->pmm.init_code, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size), Flags::SYS);
+    init_pt->remap(si->pmm.init_data, MMU::pti(si->lm.ini_data), MMU::pti(si->lm.ini_data) + MMU::pages(si->lm.ini_data_size), Flags::SYS);
 
     // Get the physical address for the SYSTEM Page Table, which was allocated with calloc()
     Page_Table * sys_pt = reinterpret_cast<Page_Table *>(si->pmm.sys_pt);
@@ -510,6 +520,11 @@ void Setup::setup_sys_pd()
         if(dir.attach(top, MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page)) != MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page))
             db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach SETUP physical memory at " << static_cast<void *>(MMU::align_segment(RAM_TOP) - sizeof(MMU::Big_Page)) << "!" << endl;
     }
+
+    // Attach Init
+    Chunk init(si->pmm.init_pt, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size) + MMU::pages(si->lm.ini_data_size));
+    if (dir.attach(init, INIT) != INIT)
+        db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach INIT at " << reinterpret_cast<void *>(INIT) << "!" << endl;
 
     // Map I/O address space into the page tables pointed by io_pt
     Chunk io(si->pmm.io_pt, MMU::pti(si->bm.mio_base), MMU::pti(si->bm.mio_base) + MMU::pages(si->bm.mio_top - si->bm.mio_base), Flags::IO, si->bm.mio_base);
