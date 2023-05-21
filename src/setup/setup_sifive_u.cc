@@ -488,9 +488,10 @@ void Setup::setup_sys_pd()
                    << ",fr2t="  << reinterpret_cast<void *>(si->pmm.free2_top)
                    << "})" << endl;
 
-    // Check alignments
-//    assert(MMU::pdi(SETUP) <= MMU::pdi(APP_LOW));
+    // Make sure machine interrupt forwarder is mapped at the last page in memory
     assert(MMU::pdi(INT_M2S) == MMU::pdi(RAM_TOP));
+
+    // Check alignments
     if(RAM_BASE != MMU::align_segment(RAM_BASE))
         db<Setup>(WRN) << "Setup::setup_sys_pd: unaligned physical memory!" << endl;
     if(PHY_MEM != MMU::align_segment(PHY_MEM))
@@ -522,7 +523,7 @@ void Setup::setup_sys_pd()
     }
 
     // Attach Init
-    Chunk init(si->pmm.init_pt, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size) + MMU::pages(si->lm.ini_data_size));
+    Chunk init(si->pmm.init_pt, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size) + MMU::pages(si->lm.ini_data_size), Flags::SYS);
     if (dir.attach(init, INIT) != INIT)
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach INIT at " << reinterpret_cast<void *>(INIT) << "!" << endl;
 
