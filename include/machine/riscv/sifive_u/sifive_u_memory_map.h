@@ -11,7 +11,7 @@ struct Memory_Map
 {
 private:
     static const bool multitask = Traits<System>::multitask;
-
+    static const bool library = (Traits<Build>::MODE == Traits<Build>::LIBRARY);
 public:
     enum : unsigned long {
         NOT_USED        = Traits<Machine>::NOT_USED,
@@ -68,10 +68,10 @@ public:
         SYS_HEAP        = multitask ? SYS + 0x00400000 : NOT_USED,
         SYS_HIGH        = multitask ? SYS_HEAP + Traits<Machine>::HEAP_SIZE : NOT_USED,
 
-        APP_LOW         = SYS_HIGH,
+        APP_LOW         = library ? PHY_MEM : SYS_HIGH,
         APP_HIGH        = Traits<Machine>::APP_HIGH,
         APP_CODE        = APP_LOW,
-        APP_DATA        = APP_CODE + 0x400000
+        APP_DATA        = library ? APP_CODE : APP_CODE + 0x400000
     };
 };
 

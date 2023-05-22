@@ -45,8 +45,8 @@ public:
     // Logical Memory
     static const unsigned long IO                = 0x0000000000000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
     static const unsigned long PHY_MEM           = RAM_BASE;                          // library ? RAM_BASE : 0x20000000; 512 MB (max 1536 MB of RAM)
-    static const unsigned long INIT              = RAM_TOP + 1;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
-    static const unsigned long SYS               = INIT + 0x400000;                           // 4 GB - 8 MB
+    static const unsigned long INIT              = library ? NOT_USED : RAM_TOP + 1;                           // library ? NOT_USED : 0x80080000; RAM_BASE + 512 KB (will be part of the free memory at INIT)
+    static const unsigned long SYS               = library ? 0xff800000 : INIT + 0x400000;                           // 4 GB - 8 MB
 
     static const unsigned long APP_HIGH          = 0xffffffffffffffff;
 };
