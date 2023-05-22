@@ -383,6 +383,8 @@ int Thread::idle()
 
     CPU::int_disable();
     db<Thread>(WRN) << "The last thread has exited!" << endl;
+    // db<Thread>(WRN) << "Deleting current task..." << endl;
+    // delete Task::current();
     if(reboot) {
         db<Thread>(WRN) << "Rebooting the machine ..." << endl;
         Machine::reboot();

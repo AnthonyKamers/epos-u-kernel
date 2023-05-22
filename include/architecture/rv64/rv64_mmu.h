@@ -244,7 +244,7 @@ public:
 
         Directory(Page_Directory * pd): _free(false), _pd(pd) {}
 
-        ~Directory() { if(_free) free(_pd, (sizeof(Page_Directory) / sizeof(Page)) - 1); } //Pra não pegar a página dos interrupt
+        ~Directory() { if(_free) free(_pd, (sizeof(Page_Directory) / sizeof(Page))); }
 
         Phy_Addr pd() const { return _pd; }
 
