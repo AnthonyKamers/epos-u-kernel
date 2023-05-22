@@ -15,15 +15,13 @@ int work_thread(int number) {
 
 int main()
 {
-    cout << "Test using FCFS scheduler (non preemptive)" << endl;
+    cout << "Test using RR scheduler (preemptive)" << endl;
 
     for (int i = 0; i < qtd_threads; i++)
-        threads[i] = new (SYSTEM) Thread(&work_thread, i);
+        threads[i] = new Thread(&work_thread, i);
 
-    for (int i = 0; i < qtd_threads; i++) {
+    for (int i = 0; i < qtd_threads; i++)
         threads[i]->join();
-        delete threads[i];
-    }
 
     return 0;
 }

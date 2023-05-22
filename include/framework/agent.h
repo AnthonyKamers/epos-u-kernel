@@ -164,6 +164,11 @@ void Agent::handle_task()
     Result res = 0;
 
     switch(method()) {
+    case CREATE1: {
+        int (* entry)();
+        in(entry);
+        id(Id(TASK_ID, reinterpret_cast<Id::Unit_Id>(new Adapter<Task>(entry))));
+    } break;
     case CREATE2: {
         Task * t;
         int (* entry)();

@@ -176,13 +176,13 @@ protected:
     }
 
 public:
-    const static unsigned int BYTES_SEGMENT = 10000;
+    const static unsigned int BYTES_SEGMENT = 8192;
 
 public:
     // Thread-like constructor, to only pass the entry point
     template<typename ... Tn>
     Task(int (* entry)(Tn ...), Tn ... an) {
-        db<Task>(TRC) << "Task() -> Making default Task" << endl;
+        db<Task>(INF) << "Task() -> Making default Task" << endl;
 
         _as = new (SYSTEM) Address_Space;
         _cs = new (SYSTEM) Segment(BYTES_SEGMENT, Segment::Flags::SYS);
@@ -218,7 +218,9 @@ public:
 
     // fork-like constructor
     template<typename ... Tn>
-    Task(Task * task = _current, int (* entry)(Tn ...) = 0, Tn ... an) {
+    Task(Task * task, int (* entry)(Tn ...) = 0, Tn ... an) {
+        db<Task>(INF) << "Task fork-like" << endl;
+
         // make new address space and copy the current process to the new one's
         _as = new (SYSTEM) Address_Space();
         auto size_current_as = sizeof(*task->address_space());

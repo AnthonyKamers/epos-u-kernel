@@ -6,6 +6,11 @@
 #include <system.h>
 #include <framework/main.h>
 
+// Framework class attributes
+__BEGIN_SYS
+Framework::Cache Framework::_cache;
+__END_SYS
+
 // Global objects
 __BEGIN_SYS
 OStream kerr;
@@ -27,6 +32,7 @@ extern "C" {
 //        msg.act();
 //    }
 
+    // backup method of printting out stuff (it goes directly, so it does not need system calls)
     int putchar(int character) {
         static volatile int *uart = (int *)(void *)0x10010000;
         while (uart[0] < 0);

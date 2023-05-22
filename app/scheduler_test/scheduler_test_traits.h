@@ -9,7 +9,7 @@ __BEGIN_SYS
 template<> struct Traits<Build>: public Traits_Tokens
 {
     // Basic configuration
-    static const unsigned int MODE = LIBRARY;
+    static const unsigned int MODE = KERNEL;
     static const unsigned int ARCHITECTURE = RV64;
     static const unsigned int MACHINE = RISCV;
     static const unsigned int MODEL = SiFive_U;
@@ -123,7 +123,7 @@ template<> struct Traits<Thread>: public Traits<Build>
     static const bool simulate_capacity = false;
     static const unsigned int QUANTUM = 10000; // us
 
-    typedef FCFS Criterion;
+    typedef RR Criterion;
 };
 
 template<> struct Traits<Scheduler<Thread>>: public Traits<Build>

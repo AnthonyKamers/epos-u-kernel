@@ -3,8 +3,6 @@
 #include <memory.h>
 #include <process.h>
 
-#define BYTES_SEGMENT TASK::BYTES_SEGMENT;
-
 using namespace EPOS;
 
 OStream cout;
