@@ -149,13 +149,21 @@ public:
 class DM: public Priority
 {
 public:
-    static const bool timed = false;
+    static const bool timed = true;
     static const bool dynamic = false;
     static const bool preemptive = true;
 
+    Microsecond _deadline;
+    Microsecond _period;
+    Microsecond _cputime;
+
 public:
     template <typename ... Tn>
-    DM(int p = NORMAL, Tn & ... an);
+    DM(int p = NORMAL, Tn & ... an): Priority(p){};
+    DM(int priority, const Microsecond & deadline = 0, const Microsecond & period = 0, const Microsecond & cputime = 0) : 
+        Priority(priority), _deadline(deadline), _period(period), _cputime(cputime){};
+
+    void update();
 };
 
 __END_SYS
