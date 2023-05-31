@@ -72,9 +72,10 @@ void IC::exception(Interrupt_Id id)
     CPU::Log_Addr tval = CPU::tval();
     Thread * thread = Thread::self();
 
-    if((id == CPU::EXC_IPF) && (epc == CPU::Log_Addr(&__exit))) { // a page fault on __exit is triggered by MAIN after returing to CRT0
+    // a page fault on __exit is triggered by MAIN after returning to CRT0
+    if((id == CPU::EXC_IPF) && (epc == CPU::Log_Addr(&__exit))) {
         db<IC, Thread>(TRC) << " => Thread::exit()";
-        CPU::a0(a0);
+        CPU::a0(sizeof(void *));
         __exit();
     } else {
         db<IC,System>(WRN) << "IC::Exception(" << id << ") => {" << hex << "thread=" << thread << ",epc=" << epc << ",sp=" << sp << ",status=" << status << ",cause=" << cause << ",tval=" << tval << "}" << dec;

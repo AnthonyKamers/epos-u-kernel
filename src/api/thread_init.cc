@@ -27,7 +27,8 @@ void Thread::init()
 
 #else
 
-    typedef int (Main)(int argc, char * argv[]);
+//    typedef int (Main)(int argc, char * argv[]);
+    typedef int (Main)();
 
     System_Info * si = System::info();
 

@@ -158,6 +158,7 @@ public:
         static void first_dispatch() __attribute__ ((naked));
 
     private:
+        Reg _usp;     // usp (used with multitasking)
         Reg _pc;      // pc
         Reg _st;      // [m|s]status
     //  Reg _x0;      // zero
@@ -192,7 +193,6 @@ public:
         Reg _x29;     // t4
         Reg _x30;     // t5
         Reg _x31;     // t6
-        Reg _usp;     // usp (used with multitasking)
     };
 
     // Interrupt Service Routines
