@@ -66,29 +66,12 @@ public:
         unsigned int stack_size;
     };
 
-    // Thread Real Time Configuration
-    struct RTConfiguration {
-        RTConfiguration(const State & s = READY, const Criterion & c = NORMAL, unsigned int ss = STACK_SIZE,
-                        const Microsecond & period = 0, const Microsecond & deadline = 0, const Microsecond & cputime = 0)
-        : state(s), criterion(c), stack_size(ss), period(period), deadline(deadline), cputime(cputime) {}
-
-        State state;
-        Criterion criterion;
-        unsigned int stack_size;
-
-        Microsecond period;
-        Microsecond deadline;
-        Microsecond cputime;
-    };
-
 
 public:
     template<typename ... Tn>
     Thread(int (* entry)(Tn ...), Tn ... an);
     template<typename ... Tn>
     Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... an);
-    template<typename ... Tn>
-    Thread(const RTConfiguration & conf, int (* entry)(Tn ...), Tn ... an);
     ~Thread();
 
     const volatile State & state() const { return _state; }
@@ -165,22 +148,12 @@ inline Thread::Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... 
     constructor_epilogue(entry, conf.stack_size);
 }
 
-template<typename ... Tn>
-inline Thread::Thread(const RTConfiguration & conf, int (* entry)(Tn ...), Tn ... an)
-: _state(conf.state), _waiting(0), _joining(0), _link(this, conf.criterion)
-{
-    constructor_prologue(conf.stack_size);
-    _context = CPU::init_stack(0, _stack + conf.stack_size, &__exit, entry, an ...);
-    constructor_epilogue(entry, conf.stack_size);
-}
-
 
 // A Java-like Active Object
 class Active: public Thread
 {
 public:
     Active(): Thread(Configuration(Thread::SUSPENDED), &entry, this) {}
-    //Active(): Thread(RTConfiguration(Thread::SUSPENDED), &entry, this) {}
 
     virtual ~Active() {}
 
