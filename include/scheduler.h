@@ -167,7 +167,7 @@ public:
 class DM: public Real_Time_Scheduler_Common
 {
 public:
-    static const bool timed = true;
+    static const bool timed = false;
     static const bool dynamic = false;
     static const bool preemptive = true;
 public:
