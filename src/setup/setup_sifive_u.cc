@@ -762,25 +762,26 @@ void _setup() // supervisor mode
 // Therefore, an interrupt forwarder must be installed in machine mode to catch MTI and manually trigger STI. We use RAM_TOP for this, with the code at the beginning of the last page and a stack at the end of the same page.
 void _int_m2s()
 {
-    // Save context
+    // we need to save the previous stack pointer here, as we will change the stacks
     ASM("       csrw    mscratch, sp                                 \n");
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
-        "       sw       a0, -12(sp)            \n"
-        "       sw       a1, -16(sp)            \n"
-        "       sw       a2, -20(sp)            \n"
-        "       sw       a3, -24(sp)            \n"
-        "       sw       a4, -28(sp)            \n"
-        "       sw       a5, -32(sp)            \n"
-        "       sw       a6, -36(sp)            \n"
-        "       sw       a7, -40(sp)            \n");
-} else {
-    ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
-        "       sd       a2, -20(sp)            \n"
-        "       sd       a3, -28(sp)            \n"
-        "       sd       a4, -36(sp)            \n"
-        "       sd       a5, -44(sp)            \n");
-}
+
+    if(Traits<CPU>::WORD_SIZE == 32) {
+        ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
+            "       sw       a0, -12(sp)            \n"
+            "       sw       a1, -16(sp)            \n"
+            "       sw       a2, -20(sp)            \n"
+            "       sw       a3, -24(sp)            \n"
+            "       sw       a4, -28(sp)            \n"
+            "       sw       a5, -32(sp)            \n"
+            "       sw       a6, -36(sp)            \n"
+            "       sw       a7, -40(sp)            \n");
+    } else {
+        ASM("       auipc    sp,      1             \n"     // SP = PC + 1 << 2 (INT_M2S + 4 + sizeof(Page))
+            "       sd       a2, -20(sp)            \n"
+            "       sd       a3, -28(sp)            \n"
+            "       sd       a4, -36(sp)            \n"
+            "       sd       a5, -44(sp)            \n");
+    }
 
     CPU::Reg id = CPU::mcause();
 
@@ -792,21 +793,24 @@ if(Traits<CPU>::WORD_SIZE == 32) {
     }
 
     // Restore context
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("       lw       a0, -12(sp)            \n"
-        "       lw       a1, -16(sp)            \n"
-        "       lw       a2, -20(sp)            \n"
-        "       lw       a3, -24(sp)            \n"
-        "       lw       a4, -28(sp)            \n"
-        "       lw       a5, -32(sp)            \n"
-        "       lw       a6, -36(sp)            \n"
-        "       lw       a7, -40(sp)            \n");
-} else {
-    ASM("       ld       a2, -20(sp)            \n"
-        "       ld       a3, -28(sp)            \n"
-        "       ld       a4, -36(sp)            \n"
-        "       ld       a5, -44(sp)            \n");
-}
+    if(Traits<CPU>::WORD_SIZE == 32) {
+        ASM("       lw       a0, -12(sp)            \n"
+            "       lw       a1, -16(sp)            \n"
+            "       lw       a2, -20(sp)            \n"
+            "       lw       a3, -24(sp)            \n"
+            "       lw       a4, -28(sp)            \n"
+            "       lw       a5, -32(sp)            \n"
+            "       lw       a6, -36(sp)            \n"
+            "       lw       a7, -40(sp)            \n");
+    } else {
+        ASM("       ld       a2, -20(sp)            \n"
+            "       ld       a3, -28(sp)            \n"
+            "       ld       a4, -36(sp)            \n"
+            "       ld       a5, -44(sp)            \n");
+    }
+
+    // we load the previous stack pointer here, as we will change the stacks again to return to where it was interrupted
+    // or delegate for supervisor interrupt handler (for timer interrupt)
     ASM("       csrr     sp, mscratch           \n"
         "       mret                            \n");
 }
