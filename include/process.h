@@ -308,6 +308,7 @@ template<typename ... Tn>
 inline Thread::Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... an)
 : _task(conf.task ? conf.task : Task::self()), _state(conf.state), _waiting(0), _joining(0), _link(this, conf.criterion) {
     if(multitask && !conf.stack_size) { // auto-expand, user-level stack
+        // make a constructor with default STACK_SIZE and set its stack
         constructor_prologue(STACK_SIZE);
         _user_stack = new (SYSTEM) Segment(USER_STACK_SIZE);
 
